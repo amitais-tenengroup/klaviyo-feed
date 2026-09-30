@@ -111,6 +111,7 @@ td img { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; displ
     <div>
       <h1>Klaviyo product feed</h1>
       <div class="sub">Public feed: <code id="feedUrl">…</code> <button class="link-btn" id="copyBtn">Copy</button></div>
+      <div class="sub" style="margin-top:4px">Source feed: <a id="sourceUrl" target="_blank" rel="noopener"><code>…</code></a> <span id="sourceInfo"></span></div>
       <div class="sub" id="lastRun" style="margin-top:4px">Loading…</div>
     </div>
     <div class="actions">
@@ -213,6 +214,14 @@ function renderHeader() {
   const wf = S?.repo ? `https://github.com/${S.repo}/actions/workflows/feed.yml` : null;
   if (wf) $('#runLink').href = wf; else $('#runLink').style.display = 'none';
   $('#feedUrl').textContent = url;
+  if (S?.sourceUrl) {
+    $('#sourceUrl').href = S.sourceUrl;
+    $('#sourceUrl code').textContent = S.sourceUrl;
+    $('#sourceInfo').textContent = [
+      S.source?.count != null ? `${fmt(S.source.count)} items` : '',
+      S.source?.lastModified ? `source updated ${when(S.source.lastModified)}` : '',
+    ].filter(Boolean).join(' · ');
+  }
   const last = RUNS[0];
   const lastOk = RUNS.find((r) => r.status === 'published');
   $('#lastRun').innerHTML = last
