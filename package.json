@@ -1,0 +1,10 @@
+{
+  "name": "klaviyo-feed",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "serve": "node scripts/serve.mjs",
+    "analyze": "node scripts/analyze.js"
+  }
+}

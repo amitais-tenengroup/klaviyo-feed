@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Klaviyo Feed Admin</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --surface-2: #f3f2ee;
+  --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
+  --s-in: #2a78d6; --s-out: #eb6834;
+  --good: #0ca30c; --good-text: #006300; --warning: #fab219; --critical: #d03b3b;
+  --accent: #2a78d6; --accent-ink: #fff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+    --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+    --s-in: #3987e5; --s-out: #d95926; --good-text: #0ca30c;
+    --accent: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+  --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+  --s-in: #3987e5; --s-out: #d95926; --good-text: #0ca30c;
+  --accent: #3987e5;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+a { color: inherit; }
+.wrap { max-width: 1200px; margin: 0 auto; padding: 24px 16px 64px; }
+header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; justify-content: space-between; margin-bottom: 20px; }
+h1 { font-size: 22px; margin: 0 0 4px; font-weight: 650; }
+h2 { font-size: 15px; margin: 0; font-weight: 650; }
+.sub { color: var(--ink-2); font-size: 13px; }
+.sub code { background: var(--surface-2); padding: 1px 6px; border-radius: 4px; font-size: 12px; word-break: break-all; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+button, select, input[type=search] {
+  font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 7px 12px; min-height: 34px;
+}
+button { cursor: pointer; }
+button:hover { background: var(--surface-2); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+button.primary:hover { filter: brightness(1.08); }
+a.btn { display: inline-flex; align-items: center; text-decoration: none; font: inherit; border-radius: 8px; padding: 7px 12px; min-height: 34px; border: 1px solid transparent; }
+a.btn.primary { background: var(--accent); color: var(--accent-ink); }
+a.btn.primary:hover { filter: brightness(1.08); }
+button:disabled { opacity: .55; cursor: wait; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+.card-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.kpi .label { color: var(--ink-2); font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
+.kpi .value { font-size: 28px; font-weight: 650; margin-top: 2px; letter-spacing: -0.01em; }
+.kpi .note { color: var(--muted); font-size: 12px; }
+.dot { width: 9px; height: 9px; border-radius: 3px; display: inline-block; flex: none; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; background: transparent; padding: 6px 12px; min-height: 32px; }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button[aria-pressed=true] { background: var(--surface-2); font-weight: 650; }
+.changes { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.chg { text-align: left; border-radius: 10px; padding: 12px 14px; background: var(--surface); }
+.chg .n { font-size: 24px; font-weight: 650; display: block; }
+.chg .l { color: var(--ink-2); font-size: 12.5px; }
+.chg[aria-pressed=true] { outline: 2px solid var(--accent); outline-offset: -1px; }
+.baseline { color: var(--muted); font-size: 12.5px; margin-top: 10px; }
+.table-wrap { overflow-x: auto; margin-top: 12px; border: 1px solid var(--border); border-radius: 10px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--grid); vertical-align: middle; }
+th { color: var(--ink-2); font-weight: 600; background: var(--surface-2); position: sticky; top: 0; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; white-space: nowrap; color: var(--ink-2); }
+td img { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; display: block; background: var(--surface-2); }
+.pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); white-space: nowrap; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.pill.good::before { background: var(--good); } .pill.bad::before { background: var(--critical); }
+.pill.warn::before { background: var(--warning); } .pill.out::before { background: var(--s-out); } .pill.in::before { background: var(--s-in); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.toolbar input[type=search] { flex: 1 1 220px; min-width: 0; }
+.pager { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 10px; color: var(--ink-2); font-size: 13px; }
+.legend { display: flex; gap: 16px; font-size: 12.5px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+#chart { position: relative; }
+#chart svg { display: block; width: 100%; height: 240px; }
+#chart text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 4px 16px rgba(0,0,0,.12); white-space: nowrap; display: none; z-index: 2; }
+.tip b { display: block; margin-bottom: 2px; }
+.tip .row { display: flex; align-items: center; gap: 6px; justify-content: space-between; }
+.tip .row span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; margin-left: 14px; }
+.empty { color: var(--muted); padding: 18px; text-align: center; }
+.err { color: var(--critical); }
+.banner { border-radius: 10px; padding: 10px 14px; margin-bottom: 16px; border: 1px solid var(--border); background: var(--surface); display: none; }
+.banner.show { display: block; }
+.link-btn { background: none; border: 0; padding: 0; min-height: 0; color: var(--accent); cursor: pointer; font-size: 12.5px; }
+.link-btn:hover { background: none; text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Klaviyo product feed</h1>
+      <div class="sub">Public feed: <code id="feedUrl">…</code> <button class="link-btn" id="copyBtn">Copy</button></div>
+      <div class="sub" id="lastRun" style="margin-top:4px">Loading…</div>
+    </div>
+    <div class="actions">
+      <a class="btn primary" id="runLink" target="_blank" rel="noopener" title="Open the workflow in GitHub, then Run workflow → mode: build / force / rollback">Rebuild or roll back ↗</a>
+    </div>
+  </header>
+
+  <div class="banner" id="banner"></div>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Changes in the feed</h2>
+      <div class="seg" id="windowSeg">
+        <button data-w="7" aria-pressed="true">7 days</button>
+        <button data-w="30" aria-pressed="false">30 days</button>
+        <button data-w="90" aria-pressed="false">90 days</button>
+      </div>
+    </div>
+    <div class="changes" id="changes"></div>
+    <div class="baseline" id="baseline"></div>
+    <div id="changeTable"></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Stock status over time</h2>
+      <div class="legend">
+        <span><i class="dot" style="background:var(--s-in)"></i>In stock</span>
+        <span><i class="dot" style="background:var(--s-out)"></i>Out of stock</span>
+        <button class="link-btn" id="chartTableBtn">Show table</button>
+      </div>
+    </div>
+    <div id="chart"></div>
+    <div id="chartTable" hidden></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Products</h2>
+      <div class="seg" id="statusSeg">
+        <button data-s="all" aria-pressed="true">In feed</button>
+        <button data-s="in" aria-pressed="false">In stock</button>
+        <button data-s="out" aria-pressed="false">Out of stock</button>
+        <button data-s="excluded" aria-pressed="false">Excluded</button>
+      </div>
+    </div>
+    <div class="toolbar">
+      <input type="search" id="q" placeholder="Search title, SKU or category…">
+      <select id="typeSel"><option value="">All product types</option></select>
+    </div>
+    <div id="products"></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Run history</h2><span class="sub">Scheduled 3× daily · 04:00, 12:00, 20:00 UTC</span></div>
+    <div id="runs"></div>
+  </section>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const fmt = (n) => (n == null || isNaN(n) ? '–' : Number(n).toLocaleString('en-US'));
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const when = (iso) => iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '–';
+const ago = (iso) => {
+  if (!iso) return '';
+  const m = Math.round((Date.now() - Date.parse(iso)) / 60000);
+  if (m < 1) return 'just now'; if (m < 60) return m + ' min ago';
+  const h = Math.round(m / 60); if (h < 48) return h + ' h ago';
+  return Math.round(h / 24) + ' days ago';
+};
+const STATUS = {
+  published: ['good', 'Published'], unchanged: ['', 'No changes'], failed: ['bad', 'Failed'],
+  skipped: ['warn', 'Skipped'], 'rolled-back': ['warn', 'Rolled back'], running: ['warn', 'Running'],
+};
+const pill = (s) => { const [c, l] = STATUS[s] || ['', s]; return `<span class="pill ${c}">${esc(l)}</span>`; };
+
+async function api(name) {
+  const r = await fetch(`data/${name}.json?v=${Date.now()}`, { cache: 'no-store' });
+  if (!r.ok) throw new Error(`${name}: HTTP ${r.status}`);
+  return r.json();
+}
+
+const TRIG = { schedule: 'Scheduled', workflow_dispatch: 'Manual', local: 'Local' };
+let S = null, HISTORY = [], RUNS = [], PRODUCTS = null;
+let win = '7', changeType = 'added', status = 'all', page = 0;
+const PAGE = 50;
+
+async function load() {
+  [S, HISTORY, RUNS] = await Promise.all([api('stats'), api('history'), api('runs')]);
+  renderHeader(); renderKpis(); renderChanges(); renderChart(); renderRuns();
+  PRODUCTS = (await api('products')) || { items: {}, excluded: {} };
+  renderTypeOptions(); renderProducts();
+}
+
+function renderHeader() {
+  const url = new URL('../' + (S?.feedFile || 'KlaviyoUS.json'), location.href).href;
+  const wf = S?.repo ? `https://github.com/${S.repo}/actions/workflows/feed.yml` : null;
+  if (wf) $('#runLink').href = wf; else $('#runLink').style.display = 'none';
+  $('#feedUrl').textContent = url;
+  const last = RUNS[0];
+  const lastOk = RUNS.find((r) => r.status === 'published');
+  $('#lastRun').innerHTML = last
+    ? `Last run ${pill(last.status)} ${esc(when(last.finishedAt || last.startedAt))} (${ago(last.finishedAt || last.startedAt)})` +
+      (lastOk ? ` · Feed last replaced ${esc(when(S?.feed?.publishedAt || lastOk.finishedAt))}` : '')
+    : 'No runs yet.';
+  const b = $('#banner');
+  if (last?.status === 'failed') {
+    b.className = 'banner show';
+    b.innerHTML = `<span class="pill bad">Last build failed</span> <span class="err">${esc(last.error)}</span> <span class="sub">The previous feed is still live.</span>`;
+  } else b.className = 'banner';
+}
+
+function renderKpis() {
+  if (!S) { $('#kpis').innerHTML = '<div class="kpi"><div class="label">No data yet</div><div class="value">–</div></div>'; return; }
+  const f = S.feed, pct = (a, b) => (b ? ((a / b) * 100).toFixed(1) + '%' : '');
+  const tiles = [
+    ['Products in feed', f.count, `${fmt(S.source.count)} in source`, null],
+    ['In stock', f.inStock, pct(f.inStock, f.count) + ' of feed', 'var(--s-in)'],
+    ['Out of stock', f.outOfStock, pct(f.outOfStock, f.count) + ' of feed', 'var(--s-out)'],
+    ['Excluded (no category)', S.excluded.count, `${fmt(S.excluded.inStock)} in stock · ${fmt(S.excluded.outOfStock)} out`, null],
+    ['Feed size', null, f.sha256 ? 'sha ' + f.sha256.slice(0, 10) : '', null, f.bytes ? (f.bytes / 1048576).toFixed(2) + ' MB' : '–'],
+  ];
+  $('#kpis').innerHTML = tiles.map(([label, v, note, color, raw]) => `
+    <div class="kpi"><div class="label">${color ? `<i class="dot" style="background:${color}"></i>` : ''}${esc(label)}</div>
+    <div class="value">${raw ?? fmt(v)}</div><div class="note">${esc(note)}</div></div>`).join('');
+}
+
+const CHG = [
+  ['added', 'Added'], ['removed', 'Removed'], ['wentOutOfStock', 'Went out of stock'],
+  ['backInStock', 'Back in stock'], ['priceChanged', 'Price changed'],
+];
+function renderChanges() {
+  const c = S?.changes?.[win];
+  if (!c || !c.baseline) {
+    $('#changes').innerHTML = ''; $('#changeTable').innerHTML = '';
+    $('#baseline').textContent = 'Not enough history yet. Change tracking starts once there is a snapshot from a previous day.';
+    return;
+  }
+  $('#changes').innerHTML = CHG.map(([k, l]) => `
+    <button class="chg" data-k="${k}" aria-pressed="${k === changeType}"><span class="n">${fmt(c[k].count)}</span><span class="l">${l}</span></button>`).join('');
+  $('#baseline').textContent = c.partial
+    ? `History only goes back to ${c.baseline}, so this compares today with ${c.baseline} (not a full ${win} days).`
+    : `Compared with the feed snapshot from ${c.baseline}.`;
+  const list = c[changeType];
+  const extra = changeType === 'priceChanged';
+  $('#changeTable').innerHTML = list.count ? `
+    <div class="table-wrap" style="max-height:420px"><table>
+      <thead><tr><th>SKU</th><th>Title</th>${extra ? '<th class="num">Old price</th><th class="num">New price</th>' : ''}</tr></thead>
+      <tbody>${list.items.map((r) => `<tr><td class="mono">${esc(r.sku)}</td>
+        <td>${r.l ? `<a href="${esc(r.l)}" target="_blank" rel="noopener">${esc(r.t)}</a>` : esc(r.t)}</td>
+        ${extra ? `<td class="num">$${esc(r.from)}</td><td class="num">$${esc(r.to)}</td>` : ''}</tr>`).join('')}</tbody>
+    </table></div>${list.count > list.items.length ? `<div class="baseline">Showing first ${fmt(list.items.length)} of ${fmt(list.count)}.</div>` : ''}`
+    : '<div class="empty">No products in this group.</div>';
+}
+
+function renderChart() {
+  const el = $('#chart');
+  const data = HISTORY.slice(-90);
+  if (!data.length) { el.innerHTML = '<div class="empty">No history yet.</div>'; return; }
+  const W = Math.max(el.clientWidth, 300), H = 240, m = { t: 12, r: 8, b: 26, l: 44 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const max = Math.max(...data.map((d) => d.total)) || 1;
+  const raw = max / 4, p10 = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 5, 10].map((x) => x * p10).find((s) => s >= raw);
+  const top = Math.ceil(max / step) * step;
+  const y = (v) => m.t + ih - (v / top) * ih;
+  const slot = iw / Math.max(data.length, 1);
+  const bw = Math.min(Math.max(slot - 2, 2), 36);
+  let g = '';
+  for (let v = 0; v <= top; v += step) {
+    g += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="${v ? 'var(--grid)' : 'var(--axis)'}" stroke-width="1"/>`;
+    g += `<text x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end">${fmt(v)}</text>`;
+  }
+  const r = Math.min(4, bw / 2);
+  const labelEvery = Math.ceil(data.length / Math.max(1, Math.floor(iw / 70)));
+  data.forEach((d, i) => {
+    const x = m.l + i * slot + (slot - bw) / 2;
+    const yIn = y(d.inStock), yTot = y(d.total);
+    // in stock: bottom segment, flat top; out of stock: top segment with rounded data-end; 2px surface gap
+    g += `<rect x="${x}" y="${yIn}" width="${bw}" height="${Math.max(y(0) - yIn, 0)}" fill="var(--s-in)"/>`;
+    const hOut = Math.max(yIn - yTot - 2, 0);
+    if (hOut > 0) g += `<path d="M${x},${yIn - 2} v${-(hOut - r)} q0,${-r} ${r},${-r} h${bw - 2 * r} q${r},0 ${r},${r} v${hOut - r} z" fill="var(--s-out)"/>`;
+    g += `<rect class="hit" data-i="${i}" x="${m.l + i * slot}" y="${m.t}" width="${slot}" height="${ih}" fill="transparent"/>`;
+    if (i % labelEvery === 0) g += `<text x="${x + bw / 2}" y="${H - 8}" text-anchor="middle">${d.date.slice(5)}</text>`;
+  });
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily in-stock and out-of-stock product counts">${g}</svg><div class="tip"></div>`;
+  const tip = el.querySelector('.tip');
+  el.querySelectorAll('.hit').forEach((h) => {
+    h.addEventListener('mousemove', (e) => {
+      const d = data[+h.dataset.i];
+      tip.innerHTML = `<b>${d.date}</b>
+        <div class="row"><span><i class="dot" style="background:var(--s-in)"></i> In stock</span><span>${fmt(d.inStock)}</span></div>
+        <div class="row"><span><i class="dot" style="background:var(--s-out)"></i> Out of stock</span><span>${fmt(d.outOfStock)}</span></div>
+        <div class="row"><span>Total in feed</span><span>${fmt(d.total)}</span></div>
+        <div class="row"><span>Excluded</span><span>${fmt(d.excluded)}</span></div>`;
+      tip.style.display = 'block';
+      const b = el.getBoundingClientRect();
+      let lx = e.clientX - b.left + 12;
+      if (lx + tip.offsetWidth > b.width) lx = e.clientX - b.left - tip.offsetWidth - 12;
+      tip.style.left = Math.max(0, lx) + 'px'; tip.style.top = Math.max(0, e.clientY - b.top - 20) + 'px';
+      h.setAttribute('fill', 'rgba(128,128,128,0.08)');
+    });
+    h.addEventListener('mouseleave', () => { tip.style.display = 'none'; h.setAttribute('fill', 'transparent'); });
+  });
+  $('#chartTable').innerHTML = `<div class="table-wrap" style="max-height:320px"><table><thead><tr><th>Date</th><th class="num">In stock</th><th class="num">Out of stock</th><th class="num">Total in feed</th><th class="num">Excluded</th><th class="num">Source</th></tr></thead>
+    <tbody>${[...data].reverse().map((d) => `<tr><td>${d.date}</td><td class="num">${fmt(d.inStock)}</td><td class="num">${fmt(d.outOfStock)}</td><td class="num">${fmt(d.total)}</td><td class="num">${fmt(d.excluded)}</td><td class="num">${fmt(d.source)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+function renderTypeOptions() {
+  const types = new Set();
+  for (const src of [PRODUCTS.items, PRODUCTS.excluded]) for (const r of Object.values(src)) types.add(r.pt || '(none)');
+  $('#typeSel').innerHTML = '<option value="">All product types</option>' +
+    [...types].sort().map((t) => `<option>${esc(t)}</option>`).join('');
+}
+
+function renderProducts() {
+  if (!PRODUCTS) { $('#products').innerHTML = '<div class="empty">Loading…</div>'; return; }
+  const src = status === 'excluded' ? PRODUCTS.excluded : PRODUCTS.items;
+  const q = $('#q').value.trim().toLowerCase(), type = $('#typeSel').value;
+  const rows = Object.entries(src).filter(([sku, r]) =>
+    (status === 'all' || status === 'excluded' || (status === 'in' ? r.a === 1 : r.a === 0)) &&
+    (!type || (r.pt || '(none)') === type) &&
+    (!q || sku.toLowerCase().includes(q) || (r.t || '').toLowerCase().includes(q) || (r.c || '').toLowerCase().includes(q)));
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE));
+  page = Math.min(page, pages - 1);
+  const slice = rows.slice(page * PAGE, page * PAGE + PAGE);
+  $('#products').innerHTML = rows.length ? `
+    <div class="table-wrap"><table>
+      <thead><tr><th></th><th>Title</th><th>SKU</th><th>Type</th><th class="num">Price</th><th class="num">Qty</th><th>Status</th><th>Categories</th></tr></thead>
+      <tbody>${slice.map(([sku, r]) => {
+        const cats = (r.c || '').split(',').filter((s) => s.trim());
+        return `<tr><td>${r.i ? `<img loading="lazy" src="${esc(r.i)}" alt="">` : ''}</td>
+          <td><a href="${esc(r.l)}" target="_blank" rel="noopener">${esc(r.t)}</a></td>
+          <td class="mono">${esc(sku)}</td><td>${esc(r.pt || '–')}</td>
+          <td class="num">$${esc(r.p)}</td><td class="num">${fmt(r.q)}</td>
+          <td>${r.a ? '<span class="pill in">In stock</span>' : '<span class="pill out">Out of stock</span>'}</td>
+          <td title="${esc(cats.join(', '))}">${cats.length ? `${cats.length} · <span class="sub">${esc(cats.slice(0, 2).join(', '))}${cats.length > 2 ? '…' : ''}</span>` : '<span class="pill warn">None</span>'}</td></tr>`;
+      }).join('')}</tbody></table></div>
+    <div class="pager"><span>${fmt(page * PAGE + 1)}–${fmt(page * PAGE + slice.length)} of ${fmt(rows.length)}</span>
+      <button id="prev" ${page ? '' : 'disabled'}>Previous</button><button id="next" ${page < pages - 1 ? '' : 'disabled'}>Next</button></div>`
+    : '<div class="empty">No products match.</div>';
+  $('#prev')?.addEventListener('click', () => { page--; renderProducts(); });
+  $('#next')?.addEventListener('click', () => { page++; renderProducts(); });
+}
+
+function renderRuns() {
+  $('#runs').innerHTML = RUNS.length ? `<div class="table-wrap" style="max-height:380px"><table>
+    <thead><tr><th>Started</th><th>Trigger</th><th>Status</th><th class="num">Source</th><th class="num">In feed</th><th class="num">Excluded</th><th class="num">Duration</th><th>Detail</th></tr></thead>
+    <tbody>${RUNS.slice(0, 100).map((r) => `<tr><td style="white-space:nowrap">${esc(when(r.startedAt))}</td><td>${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(TRIG[r.trigger] || r.trigger)}</a>` : esc(TRIG[r.trigger] || r.trigger)}${r.mode && r.mode !== 'build' ? ' · ' + esc(r.mode) : ''}</td><td>${pill(r.status)}</td>
+      <td class="num">${fmt(r.sourceCount)}</td><td class="num">${fmt(r.keptCount)}</td><td class="num">${fmt(r.excludedCount)}</td>
+      <td class="num">${r.durationMs != null ? (r.durationMs / 1000).toFixed(1) + ' s' : '–'}</td>
+      <td class="${r.error ? 'err' : 'sub'}">${esc(r.error || (r.sha256 ? 'sha ' + r.sha256.slice(0, 10) : ''))}</td></tr>`).join('')}</tbody></table></div>`
+    : '<div class="empty">No runs yet.</div>';
+}
+
+// ---- interactions ----
+$('#windowSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  win = b.dataset.w; document.querySelectorAll('#windowSeg button').forEach((x) => x.setAttribute('aria-pressed', x === b));
+  renderChanges();
+});
+$('#changes').addEventListener('click', (e) => {
+  const b = e.target.closest('.chg'); if (!b) return; changeType = b.dataset.k; renderChanges();
+});
+$('#statusSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  status = b.dataset.s; page = 0; document.querySelectorAll('#statusSeg button').forEach((x) => x.setAttribute('aria-pressed', x === b));
+  renderProducts();
+});
+let qt; $('#q').addEventListener('input', () => { clearTimeout(qt); qt = setTimeout(() => { page = 0; renderProducts(); }, 150); });
+$('#typeSel').addEventListener('change', () => { page = 0; renderProducts(); });
+$('#chartTableBtn').addEventListener('click', () => {
+  const t = $('#chartTable'); t.hidden = !t.hidden; $('#chartTableBtn').textContent = t.hidden ? 'Show table' : 'Hide table';
+});
+$('#copyBtn').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText($('#feedUrl').textContent); $('#copyBtn').textContent = 'Copied'; setTimeout(() => ($('#copyBtn').textContent = 'Copy'), 1500); } catch {}
+});
+let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(renderChart, 150); });
+
+load().catch((e) => { $('#lastRun').innerHTML = `<span class="err">${esc(e.message)}</span>`; });
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+{
+  "sourceUrl": "https://static.myka.com/us-east-1/imported-feeds/51/KlaviyoUS.json",
+  "feedFile": "KlaviyoUS.json",
+  "minItems": 500,
+  "maxDropPct": 25,
+  "historyDays": 100
+}

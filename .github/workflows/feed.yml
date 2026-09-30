@@ -1,0 +1,91 @@
+name: Build Klaviyo feed
+
+on:
+  schedule:
+    # 3x per day (UTC): 04:00, 12:00, 20:00  ->  00:00 / 08:00 / 16:00 US Eastern (EDT)
+    - cron: '0 4,12,20 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'build = normal, force = skip the drop guard, rollback = restore the previous feed'
+        type: choice
+        options: [build, force, rollback]
+        default: build
+
+permissions:
+  contents: write   # push the feed-state branch
+  pages: write      # deploy to GitHub Pages
+  id-token: write   # required by deploy-pages
+  actions: write    # keep the schedule from auto-disabling after 60 days
+
+concurrency:
+  group: klaviyo-feed
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.build.outputs.status }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Restore state (feed-state branch)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git ls-remote --exit-code --heads origin feed-state >/dev/null; then
+            git clone --depth 1 --branch feed-state \
+              "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" state
+            rm -rf state/.git
+          else
+            echo "No feed-state branch yet - first run"
+            mkdir -p state
+          fi
+
+      - name: Build feed
+        id: build
+        run: node scripts/build.mjs --mode "${{ inputs.mode || 'build' }}"
+
+      - name: Save state (single commit, force-pushed so the branch never grows)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd state
+          git init -q -b feed-state
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Feed state $(date -u +%FT%TZ) (${{ steps.build.outputs.status }})"
+          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" feed-state
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+      - name: Keep the schedule alive
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/feed.yml/enable" || true
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+      # Fail the run (GitHub emails you) when the build was rejected. The old feed is still live.
+      - name: Report failed build
+        if: needs.build.outputs.status == 'failed'
+        run: |
+          echo "::error::Feed build failed - the previous feed is still live. See the dashboard run history."
+          exit 1
