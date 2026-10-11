@@ -110,7 +110,8 @@ td img { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; displ
   <header>
     <div>
       <h1>Klaviyo product feed</h1>
-      <div class="sub">Public feed: <code id="feedUrl">…</code> <button class="link-btn" id="copyBtn">Copy</button></div>
+      <div class="sub">Product feed: <code id="feedUrl">…</code> <button class="link-btn copy" data-copy="feedUrl">Copy</button></div>
+      <div class="sub" style="margin-top:4px">Categories feed: <code id="catUrl">…</code> <button class="link-btn copy" data-copy="catUrl">Copy</button></div>
       <div class="sub" style="margin-top:4px">Source feed: <a id="sourceUrl" target="_blank" rel="noopener"><code>…</code></a> <span id="sourceInfo"></span></div>
       <div class="sub" id="lastRun" style="margin-top:4px">Loading…</div>
     </div>
@@ -168,6 +169,12 @@ td img { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; displ
   </section>
 
   <section class="card">
+    <div class="card-head"><h2>Categories</h2><span class="sub">Only categories with at least one product in the feed</span></div>
+    <div class="toolbar"><input type="search" id="catQ" placeholder="Search categories…"></div>
+    <div id="categories"></div>
+  </section>
+
+  <section class="card">
     <div class="card-head"><h2>Run history</h2><span class="sub">Scheduled 3× daily · 04:00, 12:00, 20:00 UTC</span></div>
     <div id="runs"></div>
   </section>
@@ -204,7 +211,7 @@ const PAGE = 50;
 
 async function load() {
   [S, HISTORY, RUNS] = await Promise.all([api('stats'), api('history'), api('runs')]);
-  renderHeader(); renderKpis(); renderChanges(); renderChart(); renderRuns();
+  renderHeader(); renderKpis(); renderChanges(); renderChart(); renderCategories(); renderRuns();
   PRODUCTS = (await api('products')) || { items: {}, excluded: {} };
   renderTypeOptions(); renderProducts();
 }
@@ -214,6 +221,7 @@ function renderHeader() {
   const wf = S?.repo ? `https://github.com/${S.repo}/actions/workflows/feed.yml` : null;
   if (wf) $('#runLink').href = wf; else $('#runLink').style.display = 'none';
   $('#feedUrl').textContent = url;
+  $('#catUrl').textContent = new URL('../' + (S?.categories?.file || 'KlaviyoUS-categories.json'), location.href).href;
   if (S?.sourceUrl) {
     $('#sourceUrl').href = S.sourceUrl;
     $('#sourceUrl code').textContent = S.sourceUrl;
@@ -243,6 +251,7 @@ function renderKpis() {
     ['In stock', f.inStock, pct(f.inStock, f.count) + ' of feed', 'var(--s-in)'],
     ['Out of stock', f.outOfStock, pct(f.outOfStock, f.count) + ' of feed', 'var(--s-out)'],
     ['Excluded (no category)', S.excluded.count, `${fmt(S.excluded.inStock)} in stock · ${fmt(S.excluded.outOfStock)} out`, null],
+    ['Categories with products', S.categories?.count, S.categories ? `${fmt(S.categories.allOutOfStock)} with nothing in stock` : '', null],
     ['Feed size', null, f.sha256 ? 'sha ' + f.sha256.slice(0, 10) : '', null, f.bytes ? (f.bytes / 1048576).toFixed(2) + ' MB' : '–'],
   ];
   $('#kpis').innerHTML = tiles.map(([label, v, note, color, raw]) => `
@@ -354,18 +363,31 @@ function renderProducts() {
       <thead><tr><th></th><th>Title</th><th>SKU</th><th>Type</th><th class="num">Price</th><th class="num">Qty</th><th>Status</th><th>Categories</th></tr></thead>
       <tbody>${slice.map(([sku, r]) => {
         const cats = (r.c || '').split(',').filter((s) => s.trim());
+        const nCats = r.n ?? cats.length;
         return `<tr><td>${r.i ? `<img loading="lazy" src="${esc(r.i)}" alt="">` : ''}</td>
           <td><a href="${esc(r.l)}" target="_blank" rel="noopener">${esc(r.t)}</a></td>
           <td class="mono">${esc(sku)}</td><td>${esc(r.pt || '–')}</td>
           <td class="num">$${esc(r.p)}</td><td class="num">${fmt(r.q)}</td>
           <td>${r.a ? '<span class="pill in">In stock</span>' : '<span class="pill out">Out of stock</span>'}</td>
-          <td title="${esc(cats.join(', '))}">${cats.length ? `${cats.length} · <span class="sub">${esc(cats.slice(0, 2).join(', '))}${cats.length > 2 ? '…' : ''}</span>` : '<span class="pill warn">None</span>'}</td></tr>`;
+          <td title="${esc(cats.join(', '))}">${nCats ? `${nCats} · <span class="sub">${esc(cats.slice(0, 2).join(', '))}${nCats > 2 ? '…' : ''}</span>` : '<span class="pill warn">None</span>'}</td></tr>`;
       }).join('')}</tbody></table></div>
     <div class="pager"><span>${fmt(page * PAGE + 1)}–${fmt(page * PAGE + slice.length)} of ${fmt(rows.length)}</span>
       <button id="prev" ${page ? '' : 'disabled'}>Previous</button><button id="next" ${page < pages - 1 ? '' : 'disabled'}>Next</button></div>`
     : '<div class="empty">No products match.</div>';
   $('#prev')?.addEventListener('click', () => { page--; renderProducts(); });
   $('#next')?.addEventListener('click', () => { page++; renderProducts(); });
+}
+
+function renderCategories() {
+  const all = S?.categories?.items || [];
+  const q = $('#catQ').value.trim().toLowerCase();
+  const rows = all.filter((c) => !q || c.name.toLowerCase().includes(q)).sort((a, b) => b.product_count - a.product_count);
+  $('#categories').innerHTML = rows.length ? `<div class="table-wrap" style="max-height:420px"><table>
+    <thead><tr><th>Category</th><th class="num">Products</th><th class="num">In stock</th><th class="num">Out of stock</th><th>ID</th></tr></thead>
+    <tbody>${rows.map((c) => `<tr><td>${esc(c.name)}</td><td class="num">${fmt(c.product_count)}</td><td class="num">${fmt(c.in_stock_count)}</td>
+      <td class="num">${fmt(c.product_count - c.in_stock_count)}</td><td class="mono">${esc(c.id)}</td></tr>`).join('')}</tbody></table></div>
+    <div class="pager"><span>${fmt(rows.length)} of ${fmt(all.length)} categories</span></div>`
+    : '<div class="empty">No categories match.</div>';
 }
 
 function renderRuns() {
@@ -392,14 +414,15 @@ $('#statusSeg').addEventListener('click', (e) => {
   status = b.dataset.s; page = 0; document.querySelectorAll('#statusSeg button').forEach((x) => x.setAttribute('aria-pressed', x === b));
   renderProducts();
 });
+$('#catQ').addEventListener('input', renderCategories);
 let qt; $('#q').addEventListener('input', () => { clearTimeout(qt); qt = setTimeout(() => { page = 0; renderProducts(); }, 150); });
 $('#typeSel').addEventListener('change', () => { page = 0; renderProducts(); });
 $('#chartTableBtn').addEventListener('click', () => {
   const t = $('#chartTable'); t.hidden = !t.hidden; $('#chartTableBtn').textContent = t.hidden ? 'Show table' : 'Hide table';
 });
-$('#copyBtn').addEventListener('click', async () => {
-  try { await navigator.clipboard.writeText($('#feedUrl').textContent); $('#copyBtn').textContent = 'Copied'; setTimeout(() => ($('#copyBtn').textContent = 'Copy'), 1500); } catch {}
-});
+document.querySelectorAll('.copy').forEach((b) => b.addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText($('#' + b.dataset.copy).textContent); b.textContent = 'Copied'; setTimeout(() => (b.textContent = 'Copy'), 1500); } catch {}
+}));
 let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(renderChart, 150); });
 
 load().catch((e) => { $('#lastRun').innerHTML = `<span class="err">${esc(e.message)}</span>`; });

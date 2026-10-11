@@ -23,6 +23,7 @@ const WINDOWS = [7, 30, 90];
 const LIST_CAP = 1000;
 const P = {
   feed: path.join(STATE, cfg.feedFile),
+  categories: path.join(STATE, cfg.categoriesFile),
   feedMeta: path.join(STATE, 'feed-meta.json'),
   prev: path.join(STATE, 'previous.json'),
   prevMeta: path.join(STATE, 'previous-meta.json'),
@@ -45,6 +46,66 @@ export function hasCategory(item) {
 }
 
 const inStock = (item) => item.availability === 'In Stock';
+
+// ---------- categories ----------
+
+// Categories (names) and CategoriesIDs are parallel comma-separated lists, but some names contain commas
+// ("Celestial Jewelry: Sun, Moon & Stars"). IDs never do, so IDs are the source of truth: split names
+// into pieces and re-join adjacent pieces until there is exactly one name per ID.
+function splitCategories(item, knownNames) {
+  const ids = String(item.CategoriesIDs || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const pieces = String(item.Categories || '').split(',');
+  if (!ids.length) return [];
+  if (pieces.length === ids.length) return ids.map((id, i) => ({ id, name: pieces[i].trim() }));
+  const names = [];
+  let extra = pieces.length - ids.length; // how many joins we still need
+  for (let i = 0; i < pieces.length; i++) {
+    let name = pieces[i];
+    // Join with following pieces while we still have surplus pieces and the join looks like one name:
+    // a name already seen on other products, or a continuation that starts with a space.
+    while (extra > 0 && i + 1 < pieces.length) {
+      const joined = name + ',' + pieces[i + 1];
+      if (knownNames.has(joined.trim()) || (pieces[i + 1].startsWith(' ') && !knownNames.has(pieces[i + 1].trim()))) {
+        name = joined; i++; extra--;
+      } else break;
+    }
+    names.push(name.trim());
+  }
+  if (names.length !== ids.length) return null; // could not align - caller falls back to ID-only matching
+  return ids.map((id, i) => ({ id, name: names[i] }));
+}
+
+// One entry per category that has at least one product in the published feed.
+export function buildCategories(items) {
+  const knownNames = new Set();
+  for (const it of items) {
+    const ids = String(it.CategoriesIDs || '').split(',');
+    const pieces = String(it.Categories || '').split(',');
+    if (ids.length === pieces.length) pieces.forEach((p) => knownNames.add(p.trim()));
+  }
+  const byId = new Map();
+  for (const it of items) {
+    const cats = splitCategories(it, knownNames)
+      ?? String(it.CategoriesIDs || '').split(',').map((s) => s.trim()).filter(Boolean).map((id) => ({ id, name: null }));
+    for (const { id, name } of cats) {
+      if (!byId.has(id)) byId.set(id, { id, name: null, product_count: 0, in_stock_count: 0 });
+      const c = byId.get(id);
+      if (!c.name && name) c.name = name;
+      c.product_count++;
+      if (inStock(it)) c.in_stock_count++;
+    }
+  }
+  return [...byId.values()]
+    .filter((c) => c.product_count > 0)
+    .map((c) => ({ ...c, name: c.name ?? c.id }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function writeCategories(items) {
+  const categories = buildCategories(items);
+  await fs.writeFile(P.categories, JSON.stringify(categories));
+  return categories;
+}
 
 // ---------- helpers ----------
 
@@ -128,8 +189,12 @@ async function build(run, { force }) {
     run.status = 'published';
   }
 
-  // 7. Snapshots, history and dashboard stats
-  await writeState({ kept, excluded, run });
+  // 7. Categories feed (only categories that have products in the published feed)
+  const categories = await writeCategories(kept);
+  run.categoryCount = categories.length;
+
+  // 8. Snapshots, history and dashboard stats
+  await writeState({ kept, excluded, run, categories });
 }
 
 // ---------- state / stats ----------
@@ -142,11 +207,12 @@ const toRow = (it) => ({
   pt: it.product_type,
   f: it.Family,
   c: it.Categories,
+  n: String(it.CategoriesIDs || '').split(',').filter((s) => s.trim()).length,
   l: it.ProductLink,
   i: it.ImageUrl,
 });
 
-async function writeState({ kept, excluded, run }) {
+async function writeState({ kept, excluded, run, categories }) {
   const today = day();
   const index = { builtAt: run.startedAt, items: {}, excluded: {} };
   for (const it of kept) index.items[it.SKU] = toRow(it);
@@ -212,6 +278,12 @@ async function writeState({ kept, excluded, run }) {
       inStock: excluded.filter(inStock).length,
       outOfStock: excluded.filter((x) => !inStock(x)).length,
     },
+    categories: {
+      file: cfg.categoriesFile,
+      count: categories.length,
+      allOutOfStock: categories.filter((c) => c.in_stock_count === 0).length,
+      items: categories,
+    },
     changes,
     historyStart: available[0] || today,
   });
@@ -262,6 +334,8 @@ async function rollback(run) {
     sha256: prevMeta?.sha256,
     publishedAt: prevMeta?.builtAt,
   };
+  const categories = await writeCategories(items);
+  stats.categories = { ...stats.categories, file: cfg.categoriesFile, count: categories.length, allOutOfStock: categories.filter((c) => c.in_stock_count === 0).length, items: categories };
   stats.rolledBackAt = run.startedAt;
   await writeJSON(P.stats, stats);
   run.keptCount = items.length;
@@ -275,6 +349,7 @@ async function writeSite() {
   await fs.rm(SITE, { recursive: true, force: true });
   await fs.mkdir(path.join(SITE, 'admin', 'data'), { recursive: true });
   if (await exists(P.feed)) await fs.copyFile(P.feed, path.join(SITE, cfg.feedFile));
+  if (await exists(P.categories)) await fs.copyFile(P.categories, path.join(SITE, cfg.categoriesFile));
   await fs.copyFile(path.join(ROOT, 'site', 'admin.html'), path.join(SITE, 'admin', 'index.html'));
   const data = { stats: P.stats, history: P.history, runs: P.runs, products: P.index };
   for (const [name, src] of Object.entries(data)) {

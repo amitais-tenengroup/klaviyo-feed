@@ -10,7 +10,8 @@ Myka source JSON ──(GitHub Actions, 04:00/12:00/20:00 UTC)──> scripts/bu
                                                   feed-state branch (history)         └─ /admin/           dashboard
 ```
 
-- **Feed URL:** `https://<owner>.github.io/klaviyo-feed/KlaviyoUS.json`
+- **Product feed:** `https://<owner>.github.io/klaviyo-feed/KlaviyoUS.json`
+- **Categories feed:** `https://<owner>.github.io/klaviyo-feed/KlaviyoUS-categories.json`
 - **Dashboard:** `https://<owner>.github.io/klaviyo-feed/admin/`. It is public but hidden from search
   engines. It only shows catalog data that is already public in the feed.
 
@@ -21,6 +22,20 @@ Myka source JSON ──(GitHub Actions, 04:00/12:00/20:00 UTC)──> scripts/bu
 Every kept row is written byte-for-byte as it appears in the source: same keys, key order, compact
 JSON, and UTF-8 BOM. The output is the source with rows removed and nothing else changed. Add
 future rules in `scripts/build.mjs`, where `hasCategory()` defines the current one.
+
+## Categories feed
+
+`KlaviyoUS-categories.json` lists every category that has **at least one product in the published
+feed**, sorted by name. It is rebuilt in the same run as the product feed and from the same data.
+
+```json
+[{"id":"9bece262-a6ee-49e8-969a-dedb2abc998f","name":"14k White Gold","product_count":41,"in_stock_count":31}, ...]
+```
+
+- `id` comes from `CategoriesIDs`. `name` is the matching entry in `Categories`.
+- Some category names contain commas, e.g. "Celestial Jewelry: Sun, Moon & Stars". IDs never contain
+  commas, so the IDs decide how many categories a product has, and the name pieces are re-joined to match.
+- Categories whose products are all out of stock are still listed, with `in_stock_count: 0`.
 
 ## How an update works
 
@@ -56,7 +71,8 @@ The dashboard's **Rebuild or roll back** button links to this page.
 | Key | Default | Meaning |
 |---|---|---|
 | `sourceUrl` | Myka KlaviyoUS.json | Upstream feed |
-| `feedFile` | `KlaviyoUS.json` | Public filename |
+| `feedFile` | `KlaviyoUS.json` | Public filename of the product feed |
+| `categoriesFile` | `KlaviyoUS-categories.json` | Public filename of the categories feed |
 | `minItems` | 500 | Abort if the source has fewer items |
 | `maxDropPct` | 25 | Abort if the feed shrinks more than this vs the last build |
 | `historyDays` | 100 | Days of daily snapshots to keep |
