@@ -240,6 +240,11 @@ function renderHeader() {
   if (last?.status === 'failed') {
     b.className = 'banner show';
     b.innerHTML = `<span class="pill bad">Last build failed</span> <span class="err">${esc(last.error)}</span> <span class="sub">The previous feed is still live.</span>`;
+  } else if (last && Date.now() - Date.parse(last.finishedAt || last.startedAt) > 10 * 3600 * 1000) {
+    // Builds run every 8 h; more than 10 h without one means runs are stuck or disabled in GitHub Actions.
+    b.className = 'banner show';
+    b.innerHTML = `<span class="pill warn">Feed may be stale</span> <span>No build has finished since ${esc(when(last.finishedAt || last.startedAt))} (${ago(last.finishedAt || last.startedAt)}).</span>` +
+      (S?.repo ? ` <a href="https://github.com/${esc(S.repo)}/actions" target="_blank" rel="noopener">Check GitHub Actions ↗</a>` : '');
   } else b.className = 'banner';
 }
 

@@ -18,13 +18,15 @@ permissions:
   id-token: write   # required by deploy-pages
   actions: write    # keep the schedule from auto-disabling after 60 days
 
-concurrency:
-  group: klaviyo-feed
-  cancel-in-progress: false
-
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Builds never overlap (they share the feed-state branch). Scoped to this job only, so a stuck
+    # deploy can't hold up later builds.
+    concurrency:
+      group: klaviyo-feed-build
+      cancel-in-progress: false
     outputs:
       status: ${{ steps.build.outputs.status }}
     steps:
@@ -76,6 +78,11 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # A newer deploy replaces an older one that is still waiting or running. The newer one carries newer state.
+    concurrency:
+      group: klaviyo-feed-pages
+      cancel-in-progress: true
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
