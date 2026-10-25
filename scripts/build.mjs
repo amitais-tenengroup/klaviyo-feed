@@ -10,6 +10,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { buildShopifyFeeds } from './shopify.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const STATE = path.join(ROOT, 'state');
@@ -124,6 +125,17 @@ export function buildCategories(items) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// Ready to Ship feeds for Shopify (products + inventory CSV), written into state/ under the configured paths.
+async function writeShopify(items) {
+  if (!cfg.shopify) return null;
+  const { productsCsv, inventoryCsv, summary } = buildShopifyFeeds(items, cfg.shopify);
+  for (const [file, body] of [[cfg.shopify.productsFile, productsCsv], [cfg.shopify.inventoryFile, inventoryCsv]]) {
+    await fs.mkdir(path.dirname(path.join(STATE, file)), { recursive: true });
+    await fs.writeFile(path.join(STATE, file), body);
+  }
+  return summary;
+}
+
 async function writeCategories(items) {
   const categories = buildCategories(items);
   await fs.writeFile(P.categories, JSON.stringify(categories));
@@ -218,9 +230,11 @@ async function build(run, { force }) {
   // 7. Categories feed (only categories that have products in the published feed)
   const categories = await writeCategories(kept);
   run.categoryCount = categories.length;
+  const shopify = await writeShopify(kept);
+  run.shopifyProducts = shopify?.products;
 
   // 8. Snapshots, history and dashboard stats
-  await writeState({ kept, excluded, run, categories, assignments });
+  await writeState({ kept, excluded, run, categories, assignments, shopify });
 }
 
 // ---------- state / stats ----------
@@ -238,7 +252,7 @@ const toRow = (it) => ({
   i: it.ImageUrl,
 });
 
-async function writeState({ kept, excluded, run, categories, assignments }) {
+async function writeState({ kept, excluded, run, categories, assignments, shopify }) {
   const today = day();
   const index = { builtAt: run.startedAt, items: {}, excluded: {} };
   for (const it of kept) index.items[it.SKU] = toRow(it);
@@ -311,6 +325,7 @@ async function writeState({ kept, excluded, run, categories, assignments }) {
       items: categories,
     },
     assignments,
+    shopify,
     changes,
     historyStart: available[0] || today,
   });
@@ -363,6 +378,7 @@ async function rollback(run) {
   };
   const categories = await writeCategories(items);
   stats.categories = { ...stats.categories, file: cfg.categoriesFile, count: categories.length, allOutOfStock: categories.filter((c) => c.in_stock_count === 0).length, items: categories };
+  stats.shopify = await writeShopify(items);
   stats.rolledBackAt = run.startedAt;
   await writeJSON(P.stats, stats);
   run.keptCount = items.length;
@@ -377,6 +393,11 @@ async function writeSite() {
   await fs.mkdir(path.join(SITE, 'admin', 'data'), { recursive: true });
   if (await exists(P.feed)) await fs.copyFile(P.feed, path.join(SITE, cfg.feedFile));
   if (await exists(P.categories)) await fs.copyFile(P.categories, path.join(SITE, cfg.categoriesFile));
+  for (const file of cfg.shopify ? [cfg.shopify.productsFile, cfg.shopify.inventoryFile] : []) {
+    if (!(await exists(path.join(STATE, file)))) continue;
+    await fs.mkdir(path.dirname(path.join(SITE, file)), { recursive: true });
+    await fs.copyFile(path.join(STATE, file), path.join(SITE, file));
+  }
   await fs.copyFile(path.join(ROOT, 'site', 'admin.html'), path.join(SITE, 'admin', 'index.html'));
   const data = { stats: P.stats, history: P.history, runs: P.runs, products: P.index };
   for (const [name, src] of Object.entries(data)) {

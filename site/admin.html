@@ -174,6 +174,25 @@ td img { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; displ
     <div id="categories"></div>
   </section>
 
+  <section class="card" id="rtsCard" hidden>
+    <div class="card-head">
+      <h2>Ready to Ship · Shopify feeds</h2>
+      <span class="sub" id="rtsSource"></span>
+    </div>
+    <div class="sub">Products (Shopify product import template): <code id="rtsProductsUrl">…</code> <button class="link-btn copy" data-copy="rtsProductsUrl">Copy</button></div>
+    <div class="sub" style="margin-top:4px">Inventory (Shopify inventory import): <code id="rtsInventoryUrl">…</code> <button class="link-btn copy" data-copy="rtsInventoryUrl">Copy</button> <span id="rtsLocation"></span></div>
+    <div class="kpis" id="rtsKpis" style="margin:14px 0 0"></div>
+    <div class="toolbar">
+      <div class="seg" id="rtsSeg">
+        <button data-s="all" aria-pressed="true">All</button>
+        <button data-s="in" aria-pressed="false">In stock</button>
+        <button data-s="out" aria-pressed="false">Out of stock</button>
+      </div>
+      <input type="search" id="rtsQ" placeholder="Search title or SKU…">
+    </div>
+    <div id="rtsTable"></div>
+  </section>
+
   <section class="card" id="assignCard" hidden>
     <div class="card-head"><h2>Manual category assignments</h2><span class="sub">SKUs given a category on our side (feed.config.json → categoryAssignments)</span></div>
     <div id="assignments"></div>
@@ -216,7 +235,7 @@ const PAGE = 50;
 
 async function load() {
   [S, HISTORY, RUNS] = await Promise.all([api('stats'), api('history'), api('runs')]);
-  renderHeader(); renderKpis(); renderChanges(); renderChart(); renderCategories(); renderAssignments(); renderRuns();
+  renderHeader(); renderKpis(); renderChanges(); renderChart(); renderCategories(); renderReadyToShip(); renderAssignments(); renderRuns();
   PRODUCTS = (await api('products')) || { items: {}, excluded: {} };
   renderTypeOptions(); renderProducts();
 }
@@ -400,6 +419,30 @@ function renderCategories() {
     : '<div class="empty">No categories match.</div>';
 }
 
+let rtsStatus = 'all';
+function renderReadyToShip() {
+  const r = S?.shopify;
+  $('#rtsCard').hidden = !r;
+  if (!r) return;
+  const abs = (f) => new URL('../' + f, location.href).href;
+  $('#rtsProductsUrl').textContent = abs(r.productsFile);
+  $('#rtsInventoryUrl').textContent = abs(r.inventoryFile);
+  $('#rtsLocation').textContent = `· location “${r.location}”`;
+  $('#rtsSource').innerHTML = `Category <b>${esc(r.categoryName)}</b>${r.categoryPage ? ` · <a href="${esc(r.categoryPage)}" target="_blank" rel="noopener">category page ↗</a>` : ''}`;
+  $('#rtsKpis').innerHTML = [
+    ['Products', r.products, null], ['In stock', r.inStock, 'var(--s-in)'], ['Out of stock', r.outOfStock, 'var(--s-out)'],
+  ].map(([l, v, c]) => `<div class="kpi"><div class="label">${c ? `<i class="dot" style="background:${c}"></i>` : ''}${l}</div><div class="value">${fmt(v)}</div></div>`).join('');
+  const q = $('#rtsQ').value.trim().toLowerCase();
+  const rows = (r.items || []).filter((x) => (rtsStatus === 'all' || (rtsStatus === 'in' ? x.a === 1 : x.a === 0)) &&
+    (!q || x.sku.toLowerCase().includes(q) || (x.t || '').toLowerCase().includes(q)));
+  $('#rtsTable').innerHTML = rows.length ? `<div class="table-wrap" style="max-height:420px"><table>
+    <thead><tr><th>SKU</th><th>Title</th><th class="num">Price</th><th class="num">Shopify qty</th><th>Status</th></tr></thead>
+    <tbody>${rows.map((x) => `<tr><td class="mono">${esc(x.sku)}</td><td><a href="${esc(x.l)}" target="_blank" rel="noopener">${esc(x.t)}</a></td>
+      <td class="num">${esc(x.p)}</td><td class="num">${fmt(x.q)}</td>
+      <td>${x.a ? '<span class="pill in">In stock</span>' : '<span class="pill out">Out of stock</span>'}</td></tr>`).join('')}</tbody>
+  </table></div>` : '<div class="empty">No products match.</div>';
+}
+
 const ASSIGN = {
   assigned: ['good', 'Added to feed'],
   'already-assigned': ['good', 'In feed (source already has category)'],
@@ -441,6 +484,12 @@ $('#statusSeg').addEventListener('click', (e) => {
   renderProducts();
 });
 $('#catQ').addEventListener('input', renderCategories);
+$('#rtsQ').addEventListener('input', renderReadyToShip);
+$('#rtsSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  rtsStatus = b.dataset.s; document.querySelectorAll('#rtsSeg button').forEach((x) => x.setAttribute('aria-pressed', x === b));
+  renderReadyToShip();
+});
 let qt; $('#q').addEventListener('input', () => { clearTimeout(qt); qt = setTimeout(() => { page = 0; renderProducts(); }, 150); });
 $('#typeSel').addEventListener('change', () => { page = 0; renderProducts(); });
 $('#chartTableBtn').addEventListener('click', () => {

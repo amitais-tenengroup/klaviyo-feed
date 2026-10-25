@@ -12,6 +12,8 @@ Myka source JSON ──(GitHub Actions, 04:00/12:00/20:00 UTC)──> scripts/bu
 
 - **Product feed:** `https://<owner>.github.io/klaviyo-feed/KlaviyoUS.json`
 - **Categories feed:** `https://<owner>.github.io/klaviyo-feed/KlaviyoUS-categories.json`
+- **Ready to Ship → Shopify, products:** `https://<owner>.github.io/klaviyo-feed/shopify/ready-to-ship-products.csv`
+- **Ready to Ship → Shopify, inventory:** `https://<owner>.github.io/klaviyo-feed/shopify/ready-to-ship-inventory.csv`
 - **Dashboard:** `https://<owner>.github.io/klaviyo-feed/admin/`. It is public but hidden from search
   engines. It only shows catalog data that is already public in the feed.
 
@@ -22,6 +24,31 @@ Myka source JSON ──(GitHub Actions, 04:00/12:00/20:00 UTC)──> scripts/bu
 Every kept row is written byte-for-byte as it appears in the source: same keys, key order, compact
 JSON, and UTF-8 BOM. The output is the source with rows removed and nothing else changed. Add
 future rules in `scripts/build.mjs`, where `hasCategory()` defines the current one.
+
+## Ready to Ship feeds for Shopify
+
+Built in every run from the published feed. They contain **only** products in the *Ready-to-ship jewelry*
+category (`7c55c3a1-…`), which is the category behind
+[theograce.com/categories/instantly-giftable-jewelry](https://www.theograce.com/categories/instantly-giftable-jewelry).
+
+| File | Format | Use |
+|---|---|---|
+| `shopify/ready-to-ship-products.csv` | Shopify product import template (same 61 columns) | Create / update the products in Shopify |
+| `shopify/ready-to-ship-inventory.csv` | Shopify inventory import | Set on-hand stock per SKU |
+
+How the product file is filled in:
+- **One product per SKU.** It has a single "Default Title" variant, and the handle comes from the theograce.com URL.
+- **Copied from the source:** title, description, price, and compare-at price (only when higher than the price).
+- **Product category:** mapped from `product_type` to Shopify's jewelry taxonomy.
+- **Tags:** "Ready to Ship", family, material, type and Shop For.
+- **Images:** the main image, plus the additional image as a second image row.
+- **Stock:** the on-hand quantity is 1 when the item is in stock and 0 when it is out of stock. The source only says in or out of stock, not how many are available.
+
+Settings are under `shopify` in `feed.config.json`:
+- `location`: must match your Shopify location name exactly.
+- `inStockQuantity`: a number to use for in-stock items instead of 1.
+- `status` / `published`: e.g. `Draft` / `false` to import products unpublished.
+- `vendor` and `tag`.
 
 ## Manual category assignments
 

@@ -17,5 +17,18 @@
         "555-26-5673-09"
       ]
     }
-  ]
+  ],
+  "shopify": {
+    "readyToShipCategoryId": "7c55c3a1-462c-4681-ada5-60aee1915fbc",
+    "readyToShipCategoryName": "Ready-to-ship jewelry",
+    "categoryPage": "https://www.theograce.com/categories/instantly-giftable-jewelry",
+    "productsFile": "shopify/ready-to-ship-products.csv",
+    "inventoryFile": "shopify/ready-to-ship-inventory.csv",
+    "location": "Shop location",
+    "inStockQuantity": null,
+    "vendor": "Theo Grace",
+    "status": "Active",
+    "published": true,
+    "tag": "Ready to Ship"
+  }
 }
