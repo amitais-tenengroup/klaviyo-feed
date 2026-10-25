@@ -4,5 +4,18 @@
   "categoriesFile": "KlaviyoUS-categories.json",
   "minItems": 500,
   "maxDropPct": 25,
-  "historyDays": 100
+  "historyDays": 100,
+  "categoryAssignments": [
+    {
+      "category": "Back Office Gift card",
+      "categoryId": "9e1f503e-87ac-4b84-ad75-a230267f0d9a",
+      "skus": [
+        "555-26-5000-04",
+        "555-26-5000-09",
+        "55-26-5607-04",
+        "55-26-5608-09",
+        "555-26-5673-09"
+      ]
+    }
+  ]
 }

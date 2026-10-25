@@ -47,6 +47,29 @@ export function hasCategory(item) {
 
 const inStock = (item) => item.availability === 'In Stock';
 
+// ---------- category assignments ----------
+
+// Adds a category to specific SKUs (feed.config.json -> categoryAssignments) before filtering, so items the
+// source leaves uncategorized can still be published. Only the Categories / CategoriesIDs values change;
+// the rest of the row is untouched. Returns one status line per configured SKU for the dashboard.
+export function applyCategoryAssignments(items, assignments = []) {
+  const bySku = new Map(items.map((it) => [it.SKU, it]));
+  const report = [];
+  for (const { category, categoryId, skus } of assignments) {
+    for (const sku of skus) {
+      const it = bySku.get(sku);
+      if (!it) { report.push({ sku, category, status: 'not-in-source' }); continue; }
+      const ids = String(it.CategoriesIDs || '').split(',').map((s) => s.trim()).filter(Boolean);
+      if (ids.includes(categoryId)) { report.push({ sku, category, title: it.Title, status: 'already-assigned' }); continue; }
+      const hasNames = hasCategory(it);
+      it.Categories = hasNames ? `${it.Categories},${category}` : category;
+      it.CategoriesIDs = ids.length ? `${it.CategoriesIDs},${categoryId}` : categoryId;
+      report.push({ sku, category, title: it.Title, status: 'assigned' });
+    }
+  }
+  return report;
+}
+
 // ---------- categories ----------
 
 // Categories (names) and CategoriesIDs are parallel comma-separated lists, but some names contain commas
@@ -151,7 +174,10 @@ async function build(run, { force }) {
   const noSku = items.filter((x) => !x || !x.SKU).length;
   if (noSku) throw new Error(`${noSku} source items have no SKU`);
 
-  // 3. Filter
+  // 3. Category assignments, then filter
+  const assignments = applyCategoryAssignments(items, cfg.categoryAssignments);
+  run.assigned = assignments.filter((a) => a.status === 'assigned').length;
+  run.assignmentsMissing = assignments.filter((a) => a.status === 'not-in-source').map((a) => a.sku);
   const kept = [];
   const excluded = [];
   for (const it of items) (hasCategory(it) ? kept : excluded).push(it);
@@ -194,7 +220,7 @@ async function build(run, { force }) {
   run.categoryCount = categories.length;
 
   // 8. Snapshots, history and dashboard stats
-  await writeState({ kept, excluded, run, categories });
+  await writeState({ kept, excluded, run, categories, assignments });
 }
 
 // ---------- state / stats ----------
@@ -212,7 +238,7 @@ const toRow = (it) => ({
   i: it.ImageUrl,
 });
 
-async function writeState({ kept, excluded, run, categories }) {
+async function writeState({ kept, excluded, run, categories, assignments }) {
   const today = day();
   const index = { builtAt: run.startedAt, items: {}, excluded: {} };
   for (const it of kept) index.items[it.SKU] = toRow(it);
@@ -284,6 +310,7 @@ async function writeState({ kept, excluded, run, categories }) {
       allOutOfStock: categories.filter((c) => c.in_stock_count === 0).length,
       items: categories,
     },
+    assignments,
     changes,
     historyStart: available[0] || today,
   });

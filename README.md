@@ -23,6 +23,20 @@ Every kept row is written byte-for-byte as it appears in the source: same keys, 
 JSON, and UTF-8 BOM. The output is the source with rows removed and nothing else changed. Add
 future rules in `scripts/build.mjs`, where `hasCategory()` defines the current one.
 
+## Manual category assignments
+
+`categoryAssignments` in `feed.config.json` gives specific SKUs a category on our side. It runs before the
+"no category" filter, so a SKU the source leaves uncategorized still ends up in the feed. Only the
+`Categories` and `CategoriesIDs` values change; the rest of the row stays exactly as the source sends it.
+If the SKU already has that category ID, nothing changes.
+
+| SKUs | Category |
+|---|---|
+| 555-26-5000-04, 555-26-5000-09, 55-26-5607-04, 55-26-5608-09, 555-26-5673-09 | Back Office Gift card (`9e1f503e-…`) |
+
+A SKU can only be published if it is in the Myka source. If it isn't, the dashboard lists it as
+"Not in source feed yet", and it is added automatically on the first build after Myka includes it.
+
 ## Categories feed
 
 `KlaviyoUS-categories.json` lists every category that has **at least one product in the published
@@ -73,6 +87,7 @@ The dashboard's **Rebuild or roll back** button links to this page.
 | `sourceUrl` | Myka KlaviyoUS.json | Upstream feed |
 | `feedFile` | `KlaviyoUS.json` | Public filename of the product feed |
 | `categoriesFile` | `KlaviyoUS-categories.json` | Public filename of the categories feed |
+| `categoryAssignments` | gift cards → Back Office Gift card | SKUs to add a category to (see above) |
 | `minItems` | 500 | Abort if the source has fewer items |
 | `maxDropPct` | 25 | Abort if the feed shrinks more than this vs the last build |
 | `historyDays` | 100 | Days of daily snapshots to keep |

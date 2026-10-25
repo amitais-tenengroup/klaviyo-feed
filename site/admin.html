@@ -174,6 +174,11 @@ td img { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; displ
     <div id="categories"></div>
   </section>
 
+  <section class="card" id="assignCard" hidden>
+    <div class="card-head"><h2>Manual category assignments</h2><span class="sub">SKUs given a category on our side (feed.config.json → categoryAssignments)</span></div>
+    <div id="assignments"></div>
+  </section>
+
   <section class="card">
     <div class="card-head"><h2>Run history</h2><span class="sub">Scheduled 3× daily · 04:00, 12:00, 20:00 UTC</span></div>
     <div id="runs"></div>
@@ -211,7 +216,7 @@ const PAGE = 50;
 
 async function load() {
   [S, HISTORY, RUNS] = await Promise.all([api('stats'), api('history'), api('runs')]);
-  renderHeader(); renderKpis(); renderChanges(); renderChart(); renderCategories(); renderRuns();
+  renderHeader(); renderKpis(); renderChanges(); renderChart(); renderCategories(); renderAssignments(); renderRuns();
   PRODUCTS = (await api('products')) || { items: {}, excluded: {} };
   renderTypeOptions(); renderProducts();
 }
@@ -393,6 +398,22 @@ function renderCategories() {
       <td class="num">${fmt(c.product_count - c.in_stock_count)}</td><td class="mono">${esc(c.id)}</td></tr>`).join('')}</tbody></table></div>
     <div class="pager"><span>${fmt(rows.length)} of ${fmt(all.length)} categories</span></div>`
     : '<div class="empty">No categories match.</div>';
+}
+
+const ASSIGN = {
+  assigned: ['good', 'Added to feed'],
+  'already-assigned': ['good', 'In feed (source already has category)'],
+  'not-in-source': ['warn', 'Not in source feed yet'],
+};
+function renderAssignments() {
+  const rows = S?.assignments || [];
+  $('#assignCard').hidden = !rows.length;
+  if (!rows.length) return;
+  $('#assignments').innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>SKU</th><th>Title</th><th>Category</th><th>Status</th></tr></thead>
+    <tbody>${rows.map((a) => { const [c, l] = ASSIGN[a.status] || ['', a.status];
+      return `<tr><td class="mono">${esc(a.sku)}</td><td>${esc(a.title || '–')}</td><td>${esc(a.category)}</td><td><span class="pill ${c}">${esc(l)}</span></td></tr>`; }).join('')}</tbody>
+  </table></div>${rows.some((a) => a.status === 'not-in-source') ? '<div class="baseline">SKUs that are not in the Myka source cannot be published yet. They are added automatically on the first build after Myka includes them.</div>' : ''}`;
 }
 
 function renderRuns() {
