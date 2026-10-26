@@ -224,8 +224,32 @@ async function build(run, { force }) {
   run.keptCount = kept.length;
   run.excludedCount = excluded.length;
 
-  // 4. Guard against a sudden collapse of the catalog
   const prevIndex = await readJSON(P.index, null);
+
+  // 3b. Duplicate SKUs: keep the row matching what was last published (title + price), else the last occurrence
+  const bySku = new Map();
+  for (const it of kept) {
+    const cur = bySku.get(it.SKU);
+    const prev = prevIndex?.items?.[it.SKU];
+    const matches = (x) => prev && x.Title === prev.t && String(x.Price) === String(prev.p);
+    if (!cur || !matches(cur)) bySku.set(it.SKU, it);
+  }
+  run.duplicatesDropped = kept.length - bySku.size;
+  if (run.duplicatesDropped) kept.splice(0, kept.length, ...kept.filter((it) => bySku.get(it.SKU) === it));
+
+  // 3c. Temporary SKU allowlist (feed.config.json -> skuAllowlistFile): publish only listed SKUs + backup products
+  let allowlist = null;
+  if (cfg.skuAllowlistFile) {
+    const list = JSON.parse(await fs.readFile(path.join(ROOT, cfg.skuAllowlistFile), 'utf8'));
+    const allowed = new Set([...list.skus, ...extras.map((x) => x.SKU)]);
+    const before = kept.length;
+    kept.splice(0, kept.length, ...kept.filter((it) => allowed.has(it.SKU)));
+    allowlist = { file: cfg.skuAllowlistFile, since: list.builtAt, skus: list.skus.length, blocked: before - kept.length };
+    run.notAllowlisted = allowlist.blocked;
+  }
+  run.keptCount = kept.length;
+
+  // 4. Guard against a sudden collapse of the catalog
   const prevCount = prevIndex ? Object.keys(prevIndex.items).length : 0;
   if (!force && prevCount && kept.length < prevCount * (1 - cfg.maxDropPct / 100)) {
     throw new Error(
@@ -268,7 +292,7 @@ async function build(run, { force }) {
   run.shopifyProducts = shopify?.products;
 
   // 8. Snapshots, history and dashboard stats
-  await writeState({ kept, excluded, run, categories, assignments, shopify, backup });
+  await writeState({ kept, excluded, run, categories, assignments, shopify, backup, allowlist });
 }
 
 // ---------- state / stats ----------
@@ -286,7 +310,7 @@ const toRow = (it) => ({
   i: it.ImageUrl,
 });
 
-async function writeState({ kept, excluded, run, categories, assignments, shopify, backup }) {
+async function writeState({ kept, excluded, run, categories, assignments, shopify, backup, allowlist }) {
   const today = day();
   const index = { builtAt: run.startedAt, items: {}, excluded: {} };
   for (const it of kept) index.items[it.SKU] = toRow(it);
@@ -360,6 +384,8 @@ async function writeState({ kept, excluded, run, categories, assignments, shopif
     },
     assignments,
     backup,
+    allowlist,
+    duplicatesDropped: run.duplicatesDropped || 0,
     shopify,
     changes,
     historyStart: available[0] || today,

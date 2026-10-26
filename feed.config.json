@@ -20,6 +20,7 @@
     }
   ],
   "extraProductsFile": "extra-products.json",
+  "skuAllowlistFile": "sku-allowlist.json",
   "shopify": {
     "readyToShipCategoryId": "7c55c3a1-462c-4681-ada5-60aee1915fbc",
     "readyToShipCategoryName": "Ready-to-ship jewelry",

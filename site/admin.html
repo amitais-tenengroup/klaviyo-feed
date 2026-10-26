@@ -270,6 +270,9 @@ function renderHeader() {
     b.className = 'banner show';
     b.innerHTML = `<span class="pill warn">Feed may be stale</span> <span>No build has finished since ${esc(when(last.finishedAt || last.startedAt))} (${ago(last.finishedAt || last.startedAt)}).</span>` +
       (S?.repo ? ` <a href="https://github.com/${esc(S.repo)}/actions" target="_blank" rel="noopener">Check GitHub Actions ↗</a>` : '');
+  } else if (S?.allowlist) {
+    b.className = 'banner show';
+    b.innerHTML = `<span class="pill warn">Temporary SKU allowlist on</span> <span>Only the ${fmt(S.allowlist.skus)} products from the feed of ${esc(when(S.allowlist.since))} (plus backup products) can be published. ${fmt(S.allowlist.blocked)} other products in the Myka source are being held back.</span>`;
   } else b.className = 'banner';
 }
 
