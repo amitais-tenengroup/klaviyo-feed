@@ -58,16 +58,12 @@ is missing one of these SKUs, the row is added to the **Klaviyo feed** from this
 Myka's row is used instead. These SKUs are always kept out of the Shopify feeds. The dashboard shows which
 version is live under "Manual additions".
 
-## Temporary SKU allowlist
+## SKU allowlist (off)
 
-Since 2026-10-26 the Myka export also contains turned-off and legacy products (about 4,500 more rows,
-some with no SKU or duplicate SKUs). While `skuAllowlistFile` is set in `feed.config.json`, only the SKUs in
-`sku-allowlist.json` (the feed as of 2026-10-25) plus the backup products can be published. Prices, stock
-and the other fields for those SKUs still update on every build. The dashboard shows a banner while the
-allowlist is on.
-
-**To turn it off** once Myka exports active products only: remove the `skuAllowlistFile` line from
-`feed.config.json` and push.
+If the source ever floods with products that shouldn't be live, set `"skuAllowlistFile": "sku-allowlist.json"` in
+`feed.config.json`. Only the SKUs listed in that file, plus the backup products, are then published.
+It was used on 2026-10-26, while the Myka export briefly included turned-off products, and switched off
+the same day.
 
 Also handled on every build:
 - Rows without a SKU are dropped. The build aborts if more than 5% of rows have no SKU.
