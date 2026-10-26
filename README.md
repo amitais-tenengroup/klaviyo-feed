@@ -50,6 +50,14 @@ Settings are under `shopify` in `feed.config.json`:
 - `status` / `published`: e.g. `Draft` / `false` to import products unpublished.
 - `vendor` and `tag`.
 
+## Backup products (Klaviyo feed only)
+
+`extra-products.json` holds full product rows in the feed's exact format. Today it holds the 5 digital gift
+cards, which are turned off on the live site but must render in transactional emails. If the Myka source
+is missing one of these SKUs, the row is added to the **Klaviyo feed** from this file. If Myka sends the SKU,
+Myka's row is used instead. These SKUs are always kept out of the Shopify feeds. The dashboard shows which
+version is live under "Manual additions".
+
 ## Manual category assignments
 
 `categoryAssignments` in `feed.config.json` gives specific SKUs a category on our side. It runs before the
@@ -117,6 +125,8 @@ The dashboard's **Rebuild or roll back** button links to this page.
 | `categoryAssignments` | gift cards → Back Office Gift card | SKUs to add a category to (see above) |
 | `minItems` | 500 | Abort if the source has fewer items |
 | `maxDropPct` | 25 | Abort if the feed shrinks more than this vs the last build |
+| `maxGrowthPct` | 10 | Abort if the feed grows more than this vs the last build (e.g. the source suddenly includes turned-off products) |
+| `extraProductsFile` | `extra-products.json` | Backup products for the Klaviyo feed (see above) |
 | `historyDays` | 100 | Days of daily snapshots to keep |
 
 Change the schedule in `.github/workflows/feed.yml` (cron, UTC). GitHub can start scheduled runs 5–30

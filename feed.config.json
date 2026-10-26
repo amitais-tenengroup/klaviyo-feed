@@ -4,6 +4,7 @@
   "categoriesFile": "KlaviyoUS-categories.json",
   "minItems": 500,
   "maxDropPct": 25,
+  "maxGrowthPct": 10,
   "historyDays": 100,
   "categoryAssignments": [
     {
@@ -18,6 +19,7 @@
       ]
     }
   ],
+  "extraProductsFile": "extra-products.json",
   "shopify": {
     "readyToShipCategoryId": "7c55c3a1-462c-4681-ada5-60aee1915fbc",
     "readyToShipCategoryName": "Ready-to-ship jewelry",

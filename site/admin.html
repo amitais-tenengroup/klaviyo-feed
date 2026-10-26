@@ -194,8 +194,9 @@ td img { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; displ
   </section>
 
   <section class="card" id="assignCard" hidden>
-    <div class="card-head"><h2>Manual category assignments</h2><span class="sub">SKUs given a category on our side (feed.config.json → categoryAssignments)</span></div>
+    <div class="card-head"><h2>Manual additions</h2><span class="sub">Set on our side · feed.config.json and extra-products.json</span></div>
     <div id="assignments"></div>
+    <div id="backup" style="margin-top:14px"></div>
   </section>
 
   <section class="card">
@@ -445,13 +446,22 @@ function renderReadyToShip() {
 
 const ASSIGN = {
   assigned: ['good', 'Added to feed'],
-  'already-assigned': ['good', 'In feed (source already has category)'],
+  'already-assigned': ['good', 'In feed (already has category)'],
   'not-in-source': ['warn', 'Not in source feed yet'],
+};
+const BACKUP = {
+  'from-source': ['good', 'Myka sends it · Myka row used'],
+  'added-from-backup': ['warn', 'Missing from Myka · added from backup'],
 };
 function renderAssignments() {
   const rows = S?.assignments || [];
-  $('#assignCard').hidden = !rows.length;
-  if (!rows.length) return;
+  const backup = S?.backup || [];
+  $('#assignCard').hidden = !rows.length && !backup.length;
+  $('#backup').innerHTML = backup.length ? `<div class="sub" style="margin-bottom:6px"><b>Backup products</b>: Klaviyo feed only (never in the Shopify feeds). Used when the Myka source is missing the SKU.</div>
+    <div class="table-wrap"><table><thead><tr><th>SKU</th><th>Title</th><th>Status</th></tr></thead>
+    <tbody>${backup.map((b) => { const [c, l] = BACKUP[b.status] || ['', b.status];
+      return `<tr><td class="mono">${esc(b.sku)}</td><td>${esc(b.title)}</td><td><span class="pill ${c}">${esc(l)}</span></td></tr>`; }).join('')}</tbody></table></div>` : '';
+  if (!rows.length) { $('#assignments').innerHTML = ''; return; }
   $('#assignments').innerHTML = `<div class="table-wrap"><table>
     <thead><tr><th>SKU</th><th>Title</th><th>Category</th><th>Status</th></tr></thead>
     <tbody>${rows.map((a) => { const [c, l] = ASSIGN[a.status] || ['', a.status];

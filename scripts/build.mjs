@@ -48,6 +48,27 @@ export function hasCategory(item) {
 
 const inStock = (item) => item.availability === 'In Stock';
 
+// ---------- backup products ----------
+
+// Products kept on our side (extra-products.json) for the Klaviyo feed only, e.g. gift cards that are turned
+// off on the live site but must render in transactional emails. A product is added only when the source does not
+// contain its SKU - when Myka sends it, Myka's row is used. Rows are re-keyed to the source's exact column order.
+export function addBackupProducts(items, extras) {
+  const schema = Object.keys(items[0]);
+  const have = new Set(items.map((it) => it.SKU));
+  const report = [];
+  for (const extra of extras) {
+    const unknown = Object.keys(extra).filter((k) => !schema.includes(k));
+    if (unknown.length) throw new Error(`extra product ${extra.SKU}: unknown fields ${unknown.join(', ')}`);
+    if (have.has(extra.SKU)) { report.push({ sku: extra.SKU, title: extra.Title, status: 'from-source' }); continue; }
+    const row = {};
+    for (const k of schema) row[k] = k in extra ? extra[k] : Array.isArray(items[0][k]) ? [] : '';
+    items.push(row);
+    report.push({ sku: extra.SKU, title: extra.Title, status: 'added-from-backup' });
+  }
+  return report;
+}
+
 // ---------- category assignments ----------
 
 // Adds a category to specific SKUs (feed.config.json -> categoryAssignments) before filtering, so items the
@@ -186,7 +207,10 @@ async function build(run, { force }) {
   const noSku = items.filter((x) => !x || !x.SKU).length;
   if (noSku) throw new Error(`${noSku} source items have no SKU`);
 
-  // 3. Category assignments, then filter
+  // 3. Backup products, category assignments, then filter
+  const extras = cfg.extraProductsFile ? JSON.parse(await fs.readFile(path.join(ROOT, cfg.extraProductsFile), 'utf8')) : [];
+  const backup = addBackupProducts(items, extras);
+  run.backupAdded = backup.filter((b) => b.status === 'added-from-backup').length;
   const assignments = applyCategoryAssignments(items, cfg.categoryAssignments);
   run.assigned = assignments.filter((a) => a.status === 'assigned').length;
   run.assignmentsMissing = assignments.filter((a) => a.status === 'not-in-source').map((a) => a.sku);
@@ -204,6 +228,12 @@ async function build(run, { force }) {
     throw new Error(
       `Guard: feed would drop from ${prevCount} to ${kept.length} items (> ${cfg.maxDropPct}%). ` +
       'Not published. Run the workflow manually with mode "force" if this is intended.'
+    );
+  }
+  if (!force && prevCount && cfg.maxGrowthPct != null && kept.length > prevCount * (1 + cfg.maxGrowthPct / 100)) {
+    throw new Error(
+      `Guard: feed would grow from ${prevCount} to ${kept.length} items (> ${cfg.maxGrowthPct}%). ` +
+      'Not published - check the source for products that should not be live. Run with mode "force" if this is intended.'
     );
   }
 
@@ -230,11 +260,12 @@ async function build(run, { force }) {
   // 7. Categories feed (only categories that have products in the published feed)
   const categories = await writeCategories(kept);
   run.categoryCount = categories.length;
-  const shopify = await writeShopify(kept);
+  const klaviyoOnly = new Set(extras.map((x) => x.SKU));
+  const shopify = await writeShopify(kept.filter((it) => !klaviyoOnly.has(it.SKU)));
   run.shopifyProducts = shopify?.products;
 
   // 8. Snapshots, history and dashboard stats
-  await writeState({ kept, excluded, run, categories, assignments, shopify });
+  await writeState({ kept, excluded, run, categories, assignments, shopify, backup });
 }
 
 // ---------- state / stats ----------
@@ -252,7 +283,7 @@ const toRow = (it) => ({
   i: it.ImageUrl,
 });
 
-async function writeState({ kept, excluded, run, categories, assignments, shopify }) {
+async function writeState({ kept, excluded, run, categories, assignments, shopify, backup }) {
   const today = day();
   const index = { builtAt: run.startedAt, items: {}, excluded: {} };
   for (const it of kept) index.items[it.SKU] = toRow(it);
@@ -325,6 +356,7 @@ async function writeState({ kept, excluded, run, categories, assignments, shopif
       items: categories,
     },
     assignments,
+    backup,
     shopify,
     changes,
     historyStart: available[0] || today,
