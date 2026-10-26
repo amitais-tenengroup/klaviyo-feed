@@ -277,7 +277,7 @@ function renderKpis() {
   if (!S) { $('#kpis').innerHTML = '<div class="kpi"><div class="label">No data yet</div><div class="value">–</div></div>'; return; }
   const f = S.feed, pct = (a, b) => (b ? ((a / b) * 100).toFixed(1) + '%' : '');
   const tiles = [
-    ['Products in feed', f.count, `${fmt(S.source.count)} in source`, null],
+    ['Products in feed', f.count, `${fmt(S.source.count)} in source` + (S.source.noSkuDropped ? ` · ${fmt(S.source.noSkuDropped)} without SKU dropped` : ''), null],
     ['In stock', f.inStock, pct(f.inStock, f.count) + ' of feed', 'var(--s-in)'],
     ['Out of stock', f.outOfStock, pct(f.outOfStock, f.count) + ' of feed', 'var(--s-out)'],
     ['Excluded (no category)', S.excluded.count, `${fmt(S.excluded.inStock)} in stock · ${fmt(S.excluded.outOfStock)} out`, null],

@@ -204,8 +204,11 @@ async function build(run, { force }) {
   catch (e) { throw new Error(`Source is not valid JSON: ${e.message}`); }
   if (!Array.isArray(items)) throw new Error('Source JSON is not an array');
   if (items.length < cfg.minItems) throw new Error(`Source has ${items.length} items (< minItems ${cfg.minItems})`);
+  // Rows without a SKU can't be catalog items (no ID) - drop them. A large share means a broken export: abort.
   const noSku = items.filter((x) => !x || !x.SKU).length;
-  if (noSku) throw new Error(`${noSku} source items have no SKU`);
+  if (noSku > items.length * 0.05) throw new Error(`${noSku} of ${items.length} source items have no SKU (> 5%)`);
+  if (noSku) items = items.filter((x) => x && x.SKU);
+  run.noSkuDropped = noSku;
 
   // 3. Backup products, category assignments, then filter
   const extras = cfg.extraProductsFile ? JSON.parse(await fs.readFile(path.join(ROOT, cfg.extraProductsFile), 'utf8')) : [];
@@ -217,7 +220,7 @@ async function build(run, { force }) {
   const kept = [];
   const excluded = [];
   for (const it of items) (hasCategory(it) ? kept : excluded).push(it);
-  run.sourceCount = items.length;
+  run.sourceCount = items.length + (run.noSkuDropped || 0); // as received, incl. dropped rows
   run.keptCount = kept.length;
   run.excludedCount = excluded.length;
 
@@ -335,7 +338,7 @@ async function writeState({ kept, excluded, run, categories, assignments, shopif
     sourceUrl: cfg.sourceUrl,
     feedFile: cfg.feedFile,
     repo: process.env.GITHUB_REPOSITORY || null,
-    source: { count: run.sourceCount, bytes: run.sourceBytes, lastModified: run.sourceLastModified },
+    source: { count: run.sourceCount, noSkuDropped: run.noSkuDropped || 0, bytes: run.sourceBytes, lastModified: run.sourceLastModified },
     feed: {
       count: point.total,
       inStock: point.inStock,
