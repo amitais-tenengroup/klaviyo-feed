@@ -46,7 +46,7 @@ How the product file is filled in:
 
 Settings are under `shopify` in `feed.config.json`:
 - `location`: must match your Shopify location name exactly.
-- `inStockQuantity`: a number to use for in-stock items instead of 1.
+- `inStockQuantity`: quantity used for in-stock items (currently **100**; the source only says in or out of stock). Out-of-stock items are always 0.
 - `status` / `published`: e.g. `Draft` / `false` to import products unpublished.
 - `vendor` and `tag`.
 

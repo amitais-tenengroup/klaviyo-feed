@@ -27,7 +27,7 @@
     "productsFile": "shopify/ready-to-ship-products.csv",
     "inventoryFile": "shopify/ready-to-ship-inventory.csv",
     "location": "Shop location",
-    "inStockQuantity": null,
+    "inStockQuantity": 100,
     "vendor": "Theo Grace",
     "status": "Active",
     "published": true,
