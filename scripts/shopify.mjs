@@ -72,7 +72,9 @@ export async function getShopifyToken(sc, clientId, clientSecret) {
   let body;
   try { body = JSON.parse(text); } catch { body = {}; }
   if (!res.ok || !body.access_token) {
-    const reason = String(body.error_description || body.error || text).slice(0, 200);
+    // Shopify sometimes answers with an HTML error page - keep just its <title> (e.g. "Oauth error app_not_installed")
+    const title = text.match(/<title>([^<]*)<\/title>/i)?.[1];
+    const reason = String(body.error_description || body.error || title || text).trim().slice(0, 200);
     throw new Error(`Shopify token request failed (HTTP ${res.status}): ${reason}`);
   }
   return body.access_token;
