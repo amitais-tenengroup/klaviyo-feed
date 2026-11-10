@@ -57,10 +57,30 @@ const seoDescription = (text, max = 320) => {
   return cut.slice(0, cut.lastIndexOf(' ') > 200 ? cut.lastIndexOf(' ') : cut.length) + '…';
 };
 
-// SKUs that already exist in the Shopify store (Admin GraphQL API). Returns a Set, or throws.
-// Needs feed.config.json -> shopify.storeDomain and the SHOPIFY_ADMIN_TOKEN secret (custom app with read_products).
+const storeBase = (sc) => (/^https?:\/\//.test(sc.storeDomain) ? sc.storeDomain : `https://${sc.storeDomain}`);
+
+// Admin API access token for a Dev Dashboard app installed on our own store (client credentials grant).
+// The token is valid for 24 hours, so a fresh one is requested on every build.
+export async function getShopifyToken(sc, clientId, clientSecret) {
+  const res = await fetch(`${storeBase(sc)}/admin/oauth/access_token`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: clientId, client_secret: clientSecret }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  const text = await res.text();
+  let body;
+  try { body = JSON.parse(text); } catch { body = {}; }
+  if (!res.ok || !body.access_token) {
+    const reason = String(body.error_description || body.error || text).slice(0, 200);
+    throw new Error(`Shopify token request failed (HTTP ${res.status}): ${reason}`);
+  }
+  return body.access_token;
+}
+
+// SKUs that already exist in the Shopify store (Admin GraphQL API, needs read_products). Returns a Set, or throws.
 export async function fetchShopifySkus(sc, token) {
-  const base = /^https?:\/\//.test(sc.storeDomain) ? sc.storeDomain : `https://${sc.storeDomain}`;
+  const base = storeBase(sc);
   const url = `${base}/admin/api/${sc.apiVersion || '2026-10'}/graphql.json`;
   const query = `query($cursor: String) { productVariants(first: 250, after: $cursor) {
     pageInfo { hasNextPage endCursor } nodes { sku } } }`;

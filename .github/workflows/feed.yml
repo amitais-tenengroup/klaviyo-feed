@@ -52,6 +52,8 @@ jobs:
       - name: Build feed
         id: build
         env:
+          SHOPIFY_CLIENT_ID: ${{ secrets.SHOPIFY_CLIENT_ID }}
+          SHOPIFY_CLIENT_SECRET: ${{ secrets.SHOPIFY_CLIENT_SECRET }}
           SHOPIFY_ADMIN_TOKEN: ${{ secrets.SHOPIFY_ADMIN_TOKEN }}
         run: node scripts/build.mjs --mode "${{ inputs.mode || 'build' }}"
 

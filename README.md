@@ -51,9 +51,10 @@ Ready to Ship products whose SKU is **not already in the Shopify store**. On eve
 are read through the Shopify Admin API, and the SKU match ignores capitals. Importing this file adds only
 the missing products.
 
-- **Setup:** set `shopify.storeDomain` (e.g. `your-store.myshopify.com`). Then add the repository
-  secret `SHOPIFY_ADMIN_TOKEN`: the Admin API access token of a Shopify custom app with the
-  `read_products` scope.
+- **Setup:** `shopify.storeDomain` is `iub7h5-bm.myshopify.com`. The store's SKUs are read with a Shopify Dev
+  Dashboard app that has the `read_products` scope and is installed on the store. Save the app's Client ID and
+  Client secret as the repository secrets `SHOPIFY_CLIENT_ID` and `SHOPIFY_CLIENT_SECRET`. Each build exchanges
+  them for a 24-hour access token (client credentials grant). A permanent token in `SHOPIFY_ADMIN_TOKEN` also works.
 - **If the check fails** (no setup, or an API error): the previous new-products file is kept, and the
   dashboard shows the reason. An unchecked list is never published, because importing one would create
   duplicate products.

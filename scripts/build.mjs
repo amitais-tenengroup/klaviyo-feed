@@ -10,7 +10,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { buildShopifyFeeds, fetchShopifySkus } from './shopify.mjs';
+import { buildShopifyFeeds, fetchShopifySkus, getShopifyToken } from './shopify.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const STATE = path.join(ROOT, 'state');
@@ -153,15 +153,17 @@ async function writeShopify(items) {
   // previous new-products file is kept (never publish an unchecked list - importing it would create duplicates).
   let existing = null;
   const check = { connected: false, checkedAt: null, shopifySkus: null, error: null };
-  if (cfg.shopify.storeDomain && process.env.SHOPIFY_ADMIN_TOKEN) {
+  const { SHOPIFY_CLIENT_ID: clientId, SHOPIFY_CLIENT_SECRET: clientSecret, SHOPIFY_ADMIN_TOKEN: staticToken } = process.env;
+  if (cfg.shopify.storeDomain && ((clientId && clientSecret) || staticToken)) {
     check.connected = true;
     try {
-      existing = await fetchShopifySkus(cfg.shopify, process.env.SHOPIFY_ADMIN_TOKEN);
+      const token = clientId && clientSecret ? await getShopifyToken(cfg.shopify, clientId, clientSecret) : staticToken;
+      existing = await fetchShopifySkus(cfg.shopify, token);
       check.checkedAt = new Date().toISOString();
       check.shopifySkus = existing.size;
     } catch (e) { check.error = String(e.message || e); }
   } else {
-    check.error = !cfg.shopify.storeDomain ? 'shopify.storeDomain is not set' : 'SHOPIFY_ADMIN_TOKEN secret is not set';
+    check.error = !cfg.shopify.storeDomain ? 'shopify.storeDomain is not set' : 'SHOPIFY_CLIENT_ID / SHOPIFY_CLIENT_SECRET secrets are not set';
   }
   const { productsCsv, inventoryCsv, newProductsCsv, summary } = buildShopifyFeeds(items, cfg.shopify, existing);
   summary.shopifyCheck = check;
