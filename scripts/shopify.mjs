@@ -108,8 +108,11 @@ export async function fetchShopifySkus(sc, token) {
 
 // existingSkus: Set of SKUs already on Shopify (upper-case), or null when the check is not available.
 export function buildShopifyFeeds(items, sc, existingSkus = null) {
-  const ready = items.filter((it) =>
-    String(it.CategoriesIDs || '').split(',').map((s) => s.trim()).includes(sc.readyToShipCategoryId));
+  // Ready to Ship category, plus SKUs added by hand (shopify.extraSkus) that are outside the category
+  const extra = new Set((sc.extraSkus || []).map((s) => s.trim().toUpperCase()));
+  const inCategory = (it) => String(it.CategoriesIDs || '').split(',').map((s) => s.trim()).includes(sc.readyToShipCategoryId);
+  const isExtra = (it) => extra.has(String(it.SKU).trim().toUpperCase());
+  const ready = items.filter((it) => inCategory(it) || isExtra(it));
   const quantity = (it) => {
     const inStock = it.availability === 'In Stock';
     if (!inStock) return 0;
@@ -200,7 +203,11 @@ export function buildShopifyFeeds(items, sc, existingSkus = null) {
       outOfStock: ready.filter((it) => it.availability !== 'In Stock').length,
       newProductsFile: sc.newProductsFile,
       notOnShopify: existingSkus ? ready.filter((it) => !onShopify(it)).length : null,
-      items: ready.map((it) => ({ sku: it.SKU, t: it.Title, a: it.availability === 'In Stock' ? 1 : 0, q: quantity(it), p: it.Price, l: it.ProductLink, s: onShopify(it) })),
+      items: ready.map((it) => ({ sku: it.SKU, t: it.Title, a: it.availability === 'In Stock' ? 1 : 0, q: quantity(it), p: it.Price, l: it.ProductLink, s: onShopify(it), x: !inCategory(it) ? 1 : 0 })),
+      extraSkus: [...extra].map((sku) => {
+        const it = items.find((i) => String(i.SKU).trim().toUpperCase() === sku);
+        return { sku, title: it?.Title || null, status: !it ? 'not-in-feed' : inCategory(it) ? 'in-category' : 'added' };
+      }),
     },
   };
 }

@@ -24,6 +24,10 @@
     "readyToShipCategoryId": "7c55c3a1-462c-4681-ada5-60aee1915fbc",
     "readyToShipCategoryName": "Ready-to-ship jewelry",
     "categoryPage": "https://www.theograce.com/categories/instantly-giftable-jewelry",
+    "extraSkus": [
+      "110-12-5587-28",
+      "110-12-4620-04"
+    ],
     "productsFile": "shopify/ready-to-ship-products.csv",
     "inventoryFile": "shopify/ready-to-ship-inventory.csv",
     "newProductsFile": "shopify/ready-to-ship-new-products.csv",

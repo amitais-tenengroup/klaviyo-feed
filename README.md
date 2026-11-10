@@ -44,6 +44,10 @@ How the product file is filled in:
 - **Images:** the main image, plus the additional image as a second image row.
 - **Stock:** the on-hand quantity is 1 when the item is in stock and 0 when it is out of stock. The source only says in or out of stock, not how many are available.
 
+### Extra SKUs outside the category
+
+`shopify.extraSkus` lists SKUs that go into the Shopify feeds even though they are not in the Ready-to-ship category. They are included in the products, inventory and new-products files, and the dashboard tags them "Added manually". Current list: 110-12-5587-28. 110-12-4620-04 is also listed, but it is already in the category.
+
 ### New products only (not yet on Shopify)
 
 `shopify/ready-to-ship-new-products.csv` uses the same template as the products file, but contains only

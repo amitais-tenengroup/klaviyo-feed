@@ -112,6 +112,7 @@ td img { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; displ
       <h1>Klaviyo product feed</h1>
       <div class="sub">Product feed: <code id="feedUrl">…</code> <button class="link-btn copy" data-copy="feedUrl">Copy</button></div>
       <div class="sub" style="margin-top:4px">Categories feed: <code id="catUrl">…</code> <button class="link-btn copy" data-copy="catUrl">Copy</button></div>
+      <div class="sub" style="margin-top:4px">Shopify new products only: <code id="newUrl">…</code> <button class="link-btn copy" data-copy="newUrl">Copy</button> <span id="newInfo"></span></div>
       <div class="sub" style="margin-top:4px">Source feed: <a id="sourceUrl" target="_blank" rel="noopener"><code>…</code></a> <span id="sourceInfo"></span></div>
       <div class="sub" id="lastRun" style="margin-top:4px">Loading…</div>
     </div>
@@ -248,6 +249,9 @@ function renderHeader() {
   if (wf) $('#runLink').href = wf; else $('#runLink').style.display = 'none';
   $('#feedUrl').textContent = url;
   $('#catUrl').textContent = new URL('../' + (S?.categories?.file || 'KlaviyoUS-categories.json'), location.href).href;
+  const sh = S?.shopify;
+  $('#newUrl').textContent = sh?.newProductsFile ? new URL('../' + sh.newProductsFile, location.href).href : '–';
+  $('#newInfo').textContent = sh?.notOnShopify != null ? `· ${fmt(sh.notOnShopify)} not on Shopify yet` : '· not checked against Shopify';
   if (S?.sourceUrl) {
     $('#sourceUrl').href = S.sourceUrl;
     $('#sourceUrl code').textContent = S.sourceUrl;
@@ -450,8 +454,8 @@ function renderReadyToShip() {
     (!q || x.sku.toLowerCase().includes(q) || (x.t || '').toLowerCase().includes(q)));
   $('#rtsTable').innerHTML = rows.length ? `<div class="table-wrap" style="max-height:420px"><table>
     <thead><tr><th>SKU</th><th>Title</th><th class="num">Price</th><th class="num">Shopify qty</th><th>Status</th><th>On Shopify</th></tr></thead>
-    <tbody>${rows.map((x) => `<tr><td class="mono">${esc(x.sku)}</td><td><a href="${esc(x.l)}" target="_blank" rel="noopener">${esc(x.t)}</a></td>
-      <td class="num">${esc(x.p)}</td><td class="num">${fmt(x.q)}</td>
+    <tbody>${rows.map((x) => `<tr><td class="mono">${esc(x.sku)}</td><td><a href="${esc(x.l)}" target="_blank" rel="noopener">${esc(x.t)}</a>${x.x ? ' <span class="pill">Added manually</span>' : ''}</td>
+      <td class="num">$${esc(x.p)}</td><td class="num">${fmt(x.q)}</td>
       <td>${x.a ? '<span class="pill in">In stock</span>' : '<span class="pill out">Out of stock</span>'}</td>
       <td>${x.s === true ? '<span class="pill good">Yes</span>' : x.s === false ? '<span class="pill warn">New</span>' : '–'}</td></tr>`).join('')}</tbody>
   </table></div>` : '<div class="empty">No products match.</div>';
