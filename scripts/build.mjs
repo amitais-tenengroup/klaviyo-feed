@@ -10,7 +10,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { buildShopifyFeeds } from './shopify.mjs';
+import { buildShopifyFeeds, fetchShopifySkus } from './shopify.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const STATE = path.join(ROOT, 'state');
@@ -149,8 +149,25 @@ export function buildCategories(items) {
 // Ready to Ship feeds for Shopify (products + inventory CSV), written into state/ under the configured paths.
 async function writeShopify(items) {
   if (!cfg.shopify) return null;
-  const { productsCsv, inventoryCsv, summary } = buildShopifyFeeds(items, cfg.shopify);
-  for (const [file, body] of [[cfg.shopify.productsFile, productsCsv], [cfg.shopify.inventoryFile, inventoryCsv]]) {
+  // "New products only" needs the list of SKUs already in Shopify. If the check is not set up or fails, the
+  // previous new-products file is kept (never publish an unchecked list - importing it would create duplicates).
+  let existing = null;
+  const check = { connected: false, checkedAt: null, shopifySkus: null, error: null };
+  if (cfg.shopify.storeDomain && process.env.SHOPIFY_ADMIN_TOKEN) {
+    check.connected = true;
+    try {
+      existing = await fetchShopifySkus(cfg.shopify, process.env.SHOPIFY_ADMIN_TOKEN);
+      check.checkedAt = new Date().toISOString();
+      check.shopifySkus = existing.size;
+    } catch (e) { check.error = String(e.message || e); }
+  } else {
+    check.error = !cfg.shopify.storeDomain ? 'shopify.storeDomain is not set' : 'SHOPIFY_ADMIN_TOKEN secret is not set';
+  }
+  const { productsCsv, inventoryCsv, newProductsCsv, summary } = buildShopifyFeeds(items, cfg.shopify, existing);
+  summary.shopifyCheck = check;
+  const files = [[cfg.shopify.productsFile, productsCsv], [cfg.shopify.inventoryFile, inventoryCsv]];
+  if (newProductsCsv && cfg.shopify.newProductsFile) files.push([cfg.shopify.newProductsFile, newProductsCsv]);
+  for (const [file, body] of files) {
     await fs.mkdir(path.dirname(path.join(STATE, file)), { recursive: true });
     await fs.writeFile(path.join(STATE, file), body);
   }
@@ -454,7 +471,7 @@ async function writeSite() {
   await fs.mkdir(path.join(SITE, 'admin', 'data'), { recursive: true });
   if (await exists(P.feed)) await fs.copyFile(P.feed, path.join(SITE, cfg.feedFile));
   if (await exists(P.categories)) await fs.copyFile(P.categories, path.join(SITE, cfg.categoriesFile));
-  for (const file of cfg.shopify ? [cfg.shopify.productsFile, cfg.shopify.inventoryFile] : []) {
+  for (const file of cfg.shopify ? [cfg.shopify.productsFile, cfg.shopify.inventoryFile, cfg.shopify.newProductsFile].filter(Boolean) : []) {
     if (!(await exists(path.join(STATE, file)))) continue;
     await fs.mkdir(path.dirname(path.join(SITE, file)), { recursive: true });
     await fs.copyFile(path.join(STATE, file), path.join(SITE, file));

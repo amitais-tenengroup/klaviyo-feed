@@ -44,6 +44,20 @@ How the product file is filled in:
 - **Images:** the main image, plus the additional image as a second image row.
 - **Stock:** the on-hand quantity is 1 when the item is in stock and 0 when it is out of stock. The source only says in or out of stock, not how many are available.
 
+### New products only (not yet on Shopify)
+
+`shopify/ready-to-ship-new-products.csv` uses the same template as the products file, but contains only
+Ready to Ship products whose SKU is **not already in the Shopify store**. On every build the store's SKUs
+are read through the Shopify Admin API, and the SKU match ignores capitals. Importing this file adds only
+the missing products.
+
+- **Setup:** set `shopify.storeDomain` (e.g. `your-store.myshopify.com`). Then add the repository
+  secret `SHOPIFY_ADMIN_TOKEN`: the Admin API access token of a Shopify custom app with the
+  `read_products` scope.
+- **If the check fails** (no setup, or an API error): the previous new-products file is kept, and the
+  dashboard shows the reason. An unchecked list is never published, because importing one would create
+  duplicate products.
+
 Settings are under `shopify` in `feed.config.json`:
 - `location`: must match your Shopify location name exactly.
 - `inStockQuantity`: quantity used for in-stock items (currently **100**; the source only says in or out of stock). Out-of-stock items are always 0.

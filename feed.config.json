@@ -26,11 +26,14 @@
     "categoryPage": "https://www.theograce.com/categories/instantly-giftable-jewelry",
     "productsFile": "shopify/ready-to-ship-products.csv",
     "inventoryFile": "shopify/ready-to-ship-inventory.csv",
+    "newProductsFile": "shopify/ready-to-ship-new-products.csv",
     "location": "tg affiliates",
     "inStockQuantity": 100,
     "vendor": "Theo Grace",
     "status": "Active",
     "published": true,
-    "tag": "Ready to Ship"
+    "tag": "Ready to Ship",
+    "storeDomain": "",
+    "apiVersion": "2026-10"
   }
 }

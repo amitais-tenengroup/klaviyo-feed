@@ -51,6 +51,8 @@ jobs:
 
       - name: Build feed
         id: build
+        env:
+          SHOPIFY_ADMIN_TOKEN: ${{ secrets.SHOPIFY_ADMIN_TOKEN }}
         run: node scripts/build.mjs --mode "${{ inputs.mode || 'build' }}"
 
       - name: Save state (single commit, force-pushed so the branch never grows)

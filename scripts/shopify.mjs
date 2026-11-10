@@ -57,7 +57,35 @@ const seoDescription = (text, max = 320) => {
   return cut.slice(0, cut.lastIndexOf(' ') > 200 ? cut.lastIndexOf(' ') : cut.length) + '…';
 };
 
-export function buildShopifyFeeds(items, sc) {
+// SKUs that already exist in the Shopify store (Admin GraphQL API). Returns a Set, or throws.
+// Needs feed.config.json -> shopify.storeDomain and the SHOPIFY_ADMIN_TOKEN secret (custom app with read_products).
+export async function fetchShopifySkus(sc, token) {
+  const base = /^https?:\/\//.test(sc.storeDomain) ? sc.storeDomain : `https://${sc.storeDomain}`;
+  const url = `${base}/admin/api/${sc.apiVersion || '2026-10'}/graphql.json`;
+  const query = `query($cursor: String) { productVariants(first: 250, after: $cursor) {
+    pageInfo { hasNextPage endCursor } nodes { sku } } }`;
+  const skus = new Set();
+  let cursor = null;
+  for (let page = 0; page < 400; page++) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-shopify-access-token': token },
+      body: JSON.stringify({ query, variables: { cursor } }),
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!res.ok) throw new Error(`Shopify API returned HTTP ${res.status}`);
+    const body = await res.json();
+    if (body.errors) throw new Error(`Shopify API error: ${JSON.stringify(body.errors).slice(0, 300)}`);
+    const conn = body.data.productVariants;
+    for (const n of conn.nodes) if (n.sku) skus.add(n.sku.trim().toUpperCase());
+    if (!conn.pageInfo.hasNextPage) return skus;
+    cursor = conn.pageInfo.endCursor;
+  }
+  throw new Error('Shopify API: too many pages');
+}
+
+// existingSkus: Set of SKUs already on Shopify (upper-case), or null when the check is not available.
+export function buildShopifyFeeds(items, sc, existingSkus = null) {
   const ready = items.filter((it) =>
     String(it.CategoriesIDs || '').split(',').map((s) => s.trim()).includes(sc.readyToShipCategoryId));
   const quantity = (it) => {
@@ -67,7 +95,9 @@ export function buildShopifyFeeds(items, sc) {
   };
 
   const productRows = [];
+  const newProductRows = [];
   const inventoryRows = [];
+  const onShopify = (it) => (existingSkus ? existingSkus.has(String(it.SKU).trim().toUpperCase()) : null);
   const seen = new Set();
   for (const it of ready) {
     let handle = handleOf(it);
@@ -78,7 +108,8 @@ export function buildShopifyFeeds(items, sc) {
     const tags = [sc.tag, it.Family, it.Material, it.product_type, ...(Array.isArray(it.ShopFor) ? it.ShopFor : [])]
       .map((t) => String(t || '').trim()).filter(Boolean);
 
-    productRows.push({
+    const rows = [];
+    rows.push({
       'Title': it.Title,
       'URL handle': handle,
       'Description': it.description,
@@ -110,13 +141,15 @@ export function buildShopifyFeeds(items, sc) {
     });
     // Extra image: a row with only the handle and image fields (Shopify's format for additional images)
     if (it.AdditionalImageUrl && it.AdditionalImageUrl !== it.ImageUrl) {
-      productRows.push({
+      rows.push({
         'URL handle': handle,
         'Product image URL': it.AdditionalImageUrl,
         'Image position': 2,
         'Image alt text': it.Title,
       });
     }
+    productRows.push(...rows);
+    if (onShopify(it) === false) newProductRows.push(...rows);
 
     inventoryRows.push({
       'Handle': handle,
@@ -132,6 +165,7 @@ export function buildShopifyFeeds(items, sc) {
   return {
     productsCsv: toCsv(PRODUCT_COLUMNS, productRows),
     inventoryCsv: toCsv(INVENTORY_COLUMNS, inventoryRows),
+    newProductsCsv: existingSkus ? toCsv(PRODUCT_COLUMNS, newProductRows) : null,
     summary: {
       categoryId: sc.readyToShipCategoryId,
       categoryName: sc.readyToShipCategoryName,
@@ -142,7 +176,9 @@ export function buildShopifyFeeds(items, sc) {
       products: ready.length,
       inStock: ready.filter((it) => it.availability === 'In Stock').length,
       outOfStock: ready.filter((it) => it.availability !== 'In Stock').length,
-      items: ready.map((it) => ({ sku: it.SKU, t: it.Title, a: it.availability === 'In Stock' ? 1 : 0, q: quantity(it), p: it.Price, l: it.ProductLink })),
+      newProductsFile: sc.newProductsFile,
+      notOnShopify: existingSkus ? ready.filter((it) => !onShopify(it)).length : null,
+      items: ready.map((it) => ({ sku: it.SKU, t: it.Title, a: it.availability === 'In Stock' ? 1 : 0, q: quantity(it), p: it.Price, l: it.ProductLink, s: onShopify(it) })),
     },
   };
 }
