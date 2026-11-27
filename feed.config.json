@@ -39,5 +39,19 @@
     "tag": "Ready to Ship",
     "storeDomain": "iub7h5-bm.myshopify.com",
     "apiVersion": "2026-10"
+  },
+  "sales": {
+    "metricId": "S7U6Fu",
+    "metricName": "Completed Order",
+    "windows": [
+      7,
+      30,
+      90
+    ],
+    "top": 30,
+    "backfillDays": 90,
+    "keepDays": 100,
+    "excludeSkuPattern": "^555-26-",
+    "apiRevision": "2025-10-15"
   }
 }

@@ -25,6 +25,23 @@ Every kept row is written byte-for-byte as it appears in the source: same keys, 
 JSON, and UTF-8 BOM. The output is the source with rows removed and nothing else changed. Add
 future rules in `scripts/build.mjs`, where `hasCategory()` defines the current one.
 
+## Top sellers (dashboard)
+
+The dashboard ranks the top 30 SKUs by units sold over the last 7, 30 and 90 days. Each row shows stock status and
+whether the SKU is in the Klaviyo feed.
+
+- **Data:** Klaviyo **Completed Order** events (metric `S7U6Fu`), read through the Klaviyo API with the repository
+  secret `KLAVIYO_API_KEY` (a private key with read access to events).
+- **Storage:** orders are kept on the `feed-state` branch as one file per day (`sales/YYYY-MM-DD.json`), holding
+  units, orders and revenue per SKU. The first build loads the last 90 days. After that, each build re-reads only
+  from the start of the last day it saw and overwrites those days, so nothing is counted twice. Days older than
+  100 days are removed.
+- **Not counted:** the `555-26-…` service SKUs (shipping protection, coverage, digital gift cards).
+- **Periods:** calendar days in UTC, including today. For example, "7 days" means today plus the 6 days before it.
+- **If Klaviyo can't be reached:** the stored data is kept and the dashboard shows the error.
+
+Settings are under `sales` in `feed.config.json`.
+
 ## Ready to Ship feeds for Shopify
 
 Built in every run from the published feed. They contain **only** products in the *Ready-to-ship jewelry*

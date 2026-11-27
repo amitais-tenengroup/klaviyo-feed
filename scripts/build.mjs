@@ -11,6 +11,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { buildShopifyFeeds, fetchShopifySkus, getShopifyToken } from './shopify.mjs';
+import { updateSales, computeTopSellers } from './sales.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const STATE = path.join(ROOT, 'state');
@@ -310,8 +311,26 @@ async function build(run, { force }) {
   const shopify = await writeShopify(kept.filter((it) => !klaviyoOnly.has(it.SKU)));
   run.shopifyProducts = shopify?.products;
 
-  // 8. Snapshots, history and dashboard stats
-  await writeState({ kept, excluded, run, categories, assignments, shopify, backup, allowlist });
+  // 8. Top sellers from Klaviyo orders (stored per day in state/sales, only new orders are fetched)
+  const sales = await writeSales(items, kept, run);
+
+  // 9. Snapshots, history and dashboard stats
+  await writeState({ kept, excluded, run, categories, assignments, shopify, backup, allowlist, sales });
+}
+
+async function writeSales(items, kept, run) {
+  if (!cfg.sales) return null;
+  let error = null;
+  if (process.env.KLAVIYO_API_KEY) {
+    try {
+      const r = await updateSales(STATE, cfg.sales, process.env.KLAVIYO_API_KEY);
+      run.salesEventsFetched = r.fetched;
+    } catch (e) { error = String(e.message || e); }
+  } else {
+    error = 'KLAVIYO_API_KEY secret is not set';
+  }
+  const top = await computeTopSellers(STATE, cfg.sales, items, new Set(kept.map((it) => it.SKU)));
+  return { ...(top || {}), connected: !!process.env.KLAVIYO_API_KEY, error };
 }
 
 // ---------- state / stats ----------
@@ -329,7 +348,7 @@ const toRow = (it) => ({
   i: it.ImageUrl,
 });
 
-async function writeState({ kept, excluded, run, categories, assignments, shopify, backup, allowlist }) {
+async function writeState({ kept, excluded, run, categories, assignments, shopify, backup, allowlist, sales }) {
   const today = day();
   const index = { builtAt: run.startedAt, items: {}, excluded: {} };
   for (const it of kept) index.items[it.SKU] = toRow(it);
@@ -406,6 +425,7 @@ async function writeState({ kept, excluded, run, categories, assignments, shopif
     allowlist,
     duplicatesDropped: run.duplicatesDropped || 0,
     shopify,
+    sales,
     changes,
     historyStart: available[0] || today,
   });

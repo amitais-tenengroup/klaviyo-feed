@@ -125,6 +125,19 @@ td img { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; displ
 
   <section class="kpis" id="kpis"></section>
 
+  <section class="card" id="topCard">
+    <div class="card-head">
+      <h2>Top sellers · units sold</h2>
+      <div class="seg" id="topSeg">
+        <button data-w="7" aria-pressed="true">7 days</button>
+        <button data-w="30" aria-pressed="false">30 days</button>
+        <button data-w="90" aria-pressed="false">90 days</button>
+      </div>
+    </div>
+    <div class="sub" id="topStatus"></div>
+    <div id="topTable"></div>
+  </section>
+
   <section class="card">
     <div class="card-head">
       <h2>Changes in the feed</h2>
@@ -238,7 +251,7 @@ const PAGE = 50;
 
 async function load() {
   [S, HISTORY, RUNS] = await Promise.all([api('stats'), api('history'), api('runs')]);
-  renderHeader(); renderKpis(); renderChanges(); renderChart(); renderCategories(); renderReadyToShip(); renderAssignments(); renderRuns();
+  renderHeader(); renderKpis(); renderTopSellers(); renderChanges(); renderChart(); renderCategories(); renderReadyToShip(); renderAssignments(); renderRuns();
   PRODUCTS = (await api('products')) || { items: {}, excluded: {} };
   renderTypeOptions(); renderProducts();
 }
@@ -428,6 +441,28 @@ function renderCategories() {
     : '<div class="empty">No categories match.</div>';
 }
 
+let topWin = '7';
+function renderTopSellers() {
+  const s = S?.sales;
+  if (!s) { $('#topCard').hidden = true; return; }
+  $('#topCard').hidden = false;
+  const w = s.windows?.[topWin];
+  const parts = [];
+  if (s.updatedAt) parts.push(`Klaviyo “Completed Order” events · orders saved up to ${esc(when(s.lastEventTime))} · updated ${esc(when(s.updatedAt))}`);
+  if (s.error) parts.push(`<span class="pill ${s.connected ? 'bad' : 'warn'}">${s.connected ? 'Klaviyo fetch failed' : 'Not connected to Klaviyo'}</span> <span class="err">${esc(s.error)}</span>${s.updatedAt ? ' · showing saved data' : ''}`);
+  if (w) parts.push(`${esc(w.from)} → ${esc(w.to)} · ${fmt(w.orders)} orders${w.complete ? '' : ' · <span class="pill warn">partial: history starts later</span>'} · shipping protection / coverage / digital gift cards (555-26-…) not counted`);
+  $('#topStatus').innerHTML = parts.join('<br>');
+  const STOCK = { in: '<span class="pill in">In stock</span>', out: '<span class="pill out">Out of stock</span>', missing: '<span class="pill warn">Not in Myka feed</span>' };
+  $('#topTable').innerHTML = w?.top?.length ? `<div class="table-wrap" style="max-height:520px;margin-top:10px"><table>
+    <thead><tr><th class="num">#</th><th>Product</th><th>SKU</th><th class="num">Units</th><th class="num">Orders</th><th class="num">Revenue</th><th>Stock</th><th>In Klaviyo feed</th></tr></thead>
+    <tbody>${w.top.map((r) => `<tr><td class="num">${r.rank}</td>
+      <td>${r.l ? `<a href="${esc(r.l)}" target="_blank" rel="noopener">${esc(r.t)}</a>` : esc(r.t || '–')}</td>
+      <td class="mono">${esc(r.sku)}</td><td class="num">${fmt(r.units)}</td><td class="num">${fmt(r.orders)}</td>
+      <td class="num">$${fmt(Math.round(r.revenue))}</td><td>${STOCK[r.stock] || ''}</td>
+      <td>${r.inFeed ? '<span class="pill good">Yes</span>' : '<span class="pill warn">No</span>'}</td></tr>`).join('')}</tbody>
+  </table></div>` : '<div class="empty">No sales data yet.</div>';
+}
+
 let rtsStatus = 'all';
 function renderReadyToShip() {
   const r = S?.shopify;
@@ -511,6 +546,11 @@ $('#statusSeg').addEventListener('click', (e) => {
   renderProducts();
 });
 $('#catQ').addEventListener('input', renderCategories);
+$('#topSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  topWin = b.dataset.w; document.querySelectorAll('#topSeg button').forEach((x) => x.setAttribute('aria-pressed', x === b));
+  renderTopSellers();
+});
 $('#rtsQ').addEventListener('input', renderReadyToShip);
 $('#rtsSeg').addEventListener('click', (e) => {
   const b = e.target.closest('button'); if (!b) return;
